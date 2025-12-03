@@ -1,38 +1,15 @@
 # Binaries
 pve-exporter
-*.exe
-*.dll
-*.so
-*.dylib
+pve-exporter.exe
 
-# Test binary
-*.test
-
-# Output of the go coverage tool
-*.out
-
-# Go workspace file
-go.work
-
-# Dependency directories
-vendor/
-
-# IDE
-.idea/
-.vscode/
-*.swp
-*.swo
-*~
-
-# OS
-.DS_Store
-Thumbs.db
-
-# Config files with secrets
+# Config
 config.yml
-*.local.yml
 config.test.yml
 
-# Build artifacts
-dist/
-build/
+# Metrics output (sensitive)
+metrics_*.txt
+metrics.txt
+
+# IDE
+.vscode/
+.idea/
