@@ -38,13 +38,6 @@ func main() {
 	proxmoxCollector := collector.NewProxmoxCollector(&cfg.Proxmox)
 	registry.MustRegister(proxmoxCollector)
 
-	// Register ZFS collector if enabled
-	if cfg.ZFS.Enabled {
-		log.Printf("ZFS metrics enabled, reading from %s", cfg.ZFS.KstatPath)
-		zfsCollector := collector.NewZFSCollector(cfg.ZFS.KstatPath)
-		registry.MustRegister(zfsCollector)
-	}
-
 	// Setup HTTP server
 	mux := http.NewServeMux()
 

@@ -15,7 +15,3 @@ proxmox:
 server:
   listen_address: ":9221"
   metrics_path: "/metrics"
-
-zfs:
-  enabled: true
-  kstat_path: "/proc/spl/kstat/zfs"

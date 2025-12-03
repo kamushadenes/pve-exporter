@@ -13,7 +13,6 @@ import (
 type Config struct {
 	Proxmox ProxmoxConfig `yaml:"proxmox"`
 	Server  ServerConfig  `yaml:"server"`
-	ZFS     ZFSConfig     `yaml:"zfs"`
 }
 
 // ProxmoxConfig holds Proxmox API configuration
@@ -33,12 +32,6 @@ type ProxmoxConfig struct {
 type ServerConfig struct {
 	ListenAddress string `yaml:"listen_address"`
 	MetricsPath   string `yaml:"metrics_path"`
-}
-
-// ZFSConfig holds ZFS collector configuration
-type ZFSConfig struct {
-	Enabled   bool   `yaml:"enabled"`
-	KstatPath string `yaml:"kstat_path"`
 }
 
 // Load loads configuration from file and environment variables
@@ -63,10 +56,6 @@ func Load() (*Config, error) {
 		Server: ServerConfig{
 			ListenAddress: getEnv("LISTEN_ADDRESS", ":9221"),
 			MetricsPath:   getEnv("METRICS_PATH", "/metrics"),
-		},
-		ZFS: ZFSConfig{
-			Enabled:   getEnvBool("ZFS_ENABLED", true),
-			KstatPath: getEnv("ZFS_KSTAT_PATH", "/proc/spl/kstat/zfs"),
 		},
 	}
 

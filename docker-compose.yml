@@ -21,16 +21,9 @@ services:
       # Skip TLS verification (use with caution)
       PVE_INSECURE_SKIP_VERIFY: "true"
       
-      # ZFS metrics
-      ZFS_ENABLED: "true"
-      
       # Server configuration
       LISTEN_ADDRESS: ":9221"
       METRICS_PATH: "/metrics"
-    
-    # Mount ZFS kstat if running on Proxmox host
-    volumes:
-      - /proc/spl/kstat/zfs:/proc/spl/kstat/zfs:ro
     
     # Optional: Use config file instead of environment variables
     # volumes:
