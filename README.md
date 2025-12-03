@@ -147,6 +147,47 @@ PVE_TOKEN_ID=user@realm!tokenid
 PVE_TOKEN_SECRET=your-token-secret
 ```
 
+## Required Proxmox Permissions
+
+For security best practices, create a dedicated monitoring user with **read-only** permissions instead of using the root account.
+
+### Creating a Monitoring User
+
+1. **Create a new user** in Proxmox:
+   - Navigate to: Datacenter → Permissions → Users
+   - Click "Add" and create user (e.g., `monitoring@pve`)
+
+2. **Assign read-only permissions**:
+   - Navigate to: Datacenter → Permissions
+   - Click "Add" → "User Permission"
+   - Path: `/`
+   - User: `monitoring@pve`
+   - Role: `PVEAuditor`
+
+3. **Optional: Create API Token** (recommended over password):
+   - Navigate to: Datacenter → Permissions → API Tokens
+   - Select your monitoring user
+   - Click "Add" and create token (e.g., `monitoring@pve!exporter`)
+   - **Important**: Uncheck "Privilege Separation" to inherit user permissions
+   - Save the token secret securely (shown only once)
+
+### Required Permissions
+
+The exporter requires the following **read-only** permissions:
+
+- **PVEAuditor role** provides:
+  - `Sys.Audit` - Read system information (nodes, VMs, containers)
+  - `Datastore.Audit` - Read storage information
+  - Access to API endpoints for metrics collection
+
+These permissions allow the exporter to:
+- ✅ Read node status and metrics
+- ✅ Read VM/container status and metrics
+- ✅ Read storage information
+- ❌ Cannot modify any resources
+- ❌ Cannot start/stop VMs or containers
+- ❌ Cannot change configurations
+
 ## Building from Source
 
 ```bash

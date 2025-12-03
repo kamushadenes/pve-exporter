@@ -16,28 +16,28 @@ type ZFSCollector struct {
 	kstatPath string
 
 	// ARC metrics
-	arcSize          *prometheus.Desc
-	arcCMax          *prometheus.Desc
-	arcCMin          *prometheus.Desc
-	arcC             *prometheus.Desc
-	arcP             *prometheus.Desc
-	arcHits          *prometheus.Desc
-	arcMisses        *prometheus.Desc
-	arcTargetSize    *prometheus.Desc
-	arcMRUSize       *prometheus.Desc
-	arcMFUSize       *prometheus.Desc
-	arcMRUGhostSize  *prometheus.Desc
-	arcMFUGhostSize  *prometheus.Desc
-	arcDataSize      *prometheus.Desc
-	arcMetadataSize  *prometheus.Desc
-	arcEvictSkip     *prometheus.Desc
+	arcSize           *prometheus.Desc
+	arcCMax           *prometheus.Desc
+	arcCMin           *prometheus.Desc
+	arcC              *prometheus.Desc
+	arcP              *prometheus.Desc
+	arcHits           *prometheus.Desc
+	arcMisses         *prometheus.Desc
+	arcTargetSize     *prometheus.Desc
+	arcMRUSize        *prometheus.Desc
+	arcMFUSize        *prometheus.Desc
+	arcMRUGhostSize   *prometheus.Desc
+	arcMFUGhostSize   *prometheus.Desc
+	arcDataSize       *prometheus.Desc
+	arcMetadataSize   *prometheus.Desc
+	arcEvictSkip      *prometheus.Desc
 	arcMemoryThrottle *prometheus.Desc
 
 	// Pool metrics
-	poolHealth       *prometheus.Desc
-	poolCapacity     *prometheus.Desc
-	poolAllocated    *prometheus.Desc
-	poolFree         *prometheus.Desc
+	poolHealth        *prometheus.Desc
+	poolCapacity      *prometheus.Desc
+	poolAllocated     *prometheus.Desc
+	poolFree          *prometheus.Desc
 	poolFragmentation *prometheus.Desc
 }
 
@@ -202,21 +202,21 @@ func (c *ZFSCollector) collectARCStats(ch chan<- prometheus.Metric) {
 
 	// Map of metric names to prometheus descriptors
 	metricMap := map[string]*prometheus.Desc{
-		"size":                c.arcSize,
-		"c_max":               c.arcCMax,
-		"c_min":               c.arcCMin,
-		"c":                   c.arcC,
-		"p":                   c.arcP,
-		"hits":                c.arcHits,
-		"misses":              c.arcMisses,
-		"target_size":         c.arcTargetSize,
-		"mru_size":            c.arcMRUSize,
-		"mfu_size":            c.arcMFUSize,
-		"mru_ghost_size":      c.arcMRUGhostSize,
-		"mfu_ghost_size":      c.arcMFUGhostSize,
-		"data_size":           c.arcDataSize,
-		"metadata_size":       c.arcMetadataSize,
-		"evict_skip":          c.arcEvictSkip,
+		"size":                  c.arcSize,
+		"c_max":                 c.arcCMax,
+		"c_min":                 c.arcCMin,
+		"c":                     c.arcC,
+		"p":                     c.arcP,
+		"hits":                  c.arcHits,
+		"misses":                c.arcMisses,
+		"target_size":           c.arcTargetSize,
+		"mru_size":              c.arcMRUSize,
+		"mfu_size":              c.arcMFUSize,
+		"mru_ghost_size":        c.arcMRUGhostSize,
+		"mfu_ghost_size":        c.arcMFUGhostSize,
+		"data_size":             c.arcDataSize,
+		"metadata_size":         c.arcMetadataSize,
+		"evict_skip":            c.arcEvictSkip,
 		"memory_throttle_count": c.arcMemoryThrottle,
 	}
 
