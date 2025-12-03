@@ -325,20 +325,15 @@ func (c *ProxmoxCollector) collectNodeMetrics(ch chan<- prometheus.Metric) {
 
 	var result struct {
 		Data []struct {
-			Node   string  `json:"node"`
-			Status string  `json:"status"`
-			Uptime float64 `json:"uptime"`
-			CPU    float64 `json:"cpu"`
-			Mem    struct {
-				Total float64 `json:"total"`
-				Used  float64 `json:"used"`
-				Free  float64 `json:"free"`
-			} `json:"mem"`
-			Swap struct {
-				Total float64 `json:"total"`
-				Used  float64 `json:"used"`
-				Free  float64 `json:"free"`
-			} `json:"swap"`
+			Node    string  `json:"node"`
+			Status  string  `json:"status"`
+			Uptime  float64 `json:"uptime"`
+			CPU     float64 `json:"cpu"`
+			MaxCPU  float64 `json:"maxcpu"`
+			Mem     float64 `json:"mem"`
+			MaxMem  float64 `json:"maxmem"`
+			Disk    float64 `json:"disk"`
+			MaxDisk float64 `json:"maxdisk"`
 		} `json:"data"`
 	}
 
@@ -355,12 +350,13 @@ func (c *ProxmoxCollector) collectNodeMetrics(ch chan<- prometheus.Metric) {
 		ch <- prometheus.MustNewConstMetric(c.nodeUp, prometheus.GaugeValue, up, node.Node)
 		ch <- prometheus.MustNewConstMetric(c.nodeUptime, prometheus.GaugeValue, node.Uptime, node.Node)
 		ch <- prometheus.MustNewConstMetric(c.nodeCPULoad, prometheus.GaugeValue, node.CPU, node.Node)
-		ch <- prometheus.MustNewConstMetric(c.nodeMemoryTotal, prometheus.GaugeValue, node.Mem.Total, node.Node)
-		ch <- prometheus.MustNewConstMetric(c.nodeMemoryUsed, prometheus.GaugeValue, node.Mem.Used, node.Node)
-		ch <- prometheus.MustNewConstMetric(c.nodeMemoryFree, prometheus.GaugeValue, node.Mem.Free, node.Node)
-		ch <- prometheus.MustNewConstMetric(c.nodeSwapTotal, prometheus.GaugeValue, node.Swap.Total, node.Node)
-		ch <- prometheus.MustNewConstMetric(c.nodeSwapUsed, prometheus.GaugeValue, node.Swap.Used, node.Node)
-		ch <- prometheus.MustNewConstMetric(c.nodeSwapFree, prometheus.GaugeValue, node.Swap.Free, node.Node)
+		ch <- prometheus.MustNewConstMetric(c.nodeMemoryTotal, prometheus.GaugeValue, node.MaxMem, node.Node)
+		ch <- prometheus.MustNewConstMetric(c.nodeMemoryUsed, prometheus.GaugeValue, node.Mem, node.Node)
+		ch <- prometheus.MustNewConstMetric(c.nodeMemoryFree, prometheus.GaugeValue, node.MaxMem-node.Mem, node.Node)
+		// Swap metrics are not available in /nodes endpoint
+		ch <- prometheus.MustNewConstMetric(c.nodeSwapTotal, prometheus.GaugeValue, 0, node.Node)
+		ch <- prometheus.MustNewConstMetric(c.nodeSwapUsed, prometheus.GaugeValue, 0, node.Node)
+		ch <- prometheus.MustNewConstMetric(c.nodeSwapFree, prometheus.GaugeValue, 0, node.Node)
 	}
 }
 
