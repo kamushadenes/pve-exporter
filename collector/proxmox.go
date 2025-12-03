@@ -32,7 +32,7 @@ type ProxmoxCollector struct {
 	nodeSwapUsed    *prometheus.Desc
 	nodeSwapFree    *prometheus.Desc
 
-	// VM/Container metrics
+	// VM metrics
 	vmStatus    *prometheus.Desc
 	vmUptime    *prometheus.Desc
 	vmCPU       *prometheus.Desc
@@ -45,6 +45,20 @@ type ProxmoxCollector struct {
 	vmNetOut    *prometheus.Desc
 	vmDiskRead  *prometheus.Desc
 	vmDiskWrite *prometheus.Desc
+
+	// LXC metrics
+	lxcStatus    *prometheus.Desc
+	lxcUptime    *prometheus.Desc
+	lxcCPU       *prometheus.Desc
+	lxcCPUs      *prometheus.Desc
+	lxcMemory    *prometheus.Desc
+	lxcMaxMemory *prometheus.Desc
+	lxcDisk      *prometheus.Desc
+	lxcMaxDisk   *prometheus.Desc
+	lxcNetIn     *prometheus.Desc
+	lxcNetOut    *prometheus.Desc
+	lxcDiskRead  *prometheus.Desc
+	lxcDiskWrite *prometheus.Desc
 
 	// Storage metrics
 	storageTotal *prometheus.Desc
@@ -114,66 +128,128 @@ func NewProxmoxCollector(cfg *config.ProxmoxConfig) *ProxmoxCollector {
 			[]string{"node"}, nil,
 		),
 
-		// VM/Container metrics
+		// VM metrics
 		vmStatus: prometheus.NewDesc(
 			"pve_vm_status",
-			"VM/Container status (1=running, 0=stopped)",
-			[]string{"node", "type", "vmid", "name"}, nil,
+			"VM status (1=running, 0=stopped)",
+			[]string{"node", "vmid", "name"}, nil,
 		),
 		vmUptime: prometheus.NewDesc(
 			"pve_vm_uptime_seconds",
-			"VM/Container uptime in seconds",
-			[]string{"node", "type", "vmid", "name"}, nil,
+			"VM uptime in seconds",
+			[]string{"node", "vmid", "name"}, nil,
 		),
 		vmCPU: prometheus.NewDesc(
 			"pve_vm_cpu_usage",
-			"VM/Container CPU usage",
-			[]string{"node", "type", "vmid", "name"}, nil,
+			"VM CPU usage",
+			[]string{"node", "vmid", "name"}, nil,
 		),
 		vmCPUs: prometheus.NewDesc(
 			"pve_vm_cpus",
-			"Number of CPUs allocated to VM/Container",
-			[]string{"node", "type", "vmid", "name"}, nil,
+			"Number of CPUs allocated to VM",
+			[]string{"node", "vmid", "name"}, nil,
 		),
 		vmMemory: prometheus.NewDesc(
 			"pve_vm_memory_used_bytes",
-			"VM/Container memory usage in bytes",
-			[]string{"node", "type", "vmid", "name"}, nil,
+			"VM memory usage in bytes",
+			[]string{"node", "vmid", "name"}, nil,
 		),
 		vmMaxMemory: prometheus.NewDesc(
 			"pve_vm_memory_max_bytes",
-			"VM/Container maximum memory in bytes",
-			[]string{"node", "type", "vmid", "name"}, nil,
+			"VM maximum memory in bytes",
+			[]string{"node", "vmid", "name"}, nil,
 		),
 		vmDisk: prometheus.NewDesc(
 			"pve_vm_disk_used_bytes",
-			"VM/Container disk usage in bytes",
-			[]string{"node", "type", "vmid", "name"}, nil,
+			"VM disk usage in bytes",
+			[]string{"node", "vmid", "name"}, nil,
 		),
 		vmMaxDisk: prometheus.NewDesc(
 			"pve_vm_disk_max_bytes",
-			"VM/Container maximum disk in bytes",
-			[]string{"node", "type", "vmid", "name"}, nil,
+			"VM maximum disk in bytes",
+			[]string{"node", "vmid", "name"}, nil,
 		),
 		vmNetIn: prometheus.NewDesc(
 			"pve_vm_network_in_bytes_total",
-			"VM/Container network input in bytes",
-			[]string{"node", "type", "vmid", "name"}, nil,
+			"VM network input in bytes",
+			[]string{"node", "vmid", "name"}, nil,
 		),
 		vmNetOut: prometheus.NewDesc(
 			"pve_vm_network_out_bytes_total",
-			"VM/Container network output in bytes",
-			[]string{"node", "type", "vmid", "name"}, nil,
+			"VM network output in bytes",
+			[]string{"node", "vmid", "name"}, nil,
 		),
 		vmDiskRead: prometheus.NewDesc(
 			"pve_vm_disk_read_bytes_total",
-			"VM/Container disk read in bytes",
-			[]string{"node", "type", "vmid", "name"}, nil,
+			"VM disk read in bytes",
+			[]string{"node", "vmid", "name"}, nil,
 		),
 		vmDiskWrite: prometheus.NewDesc(
 			"pve_vm_disk_write_bytes_total",
-			"VM/Container disk write in bytes",
-			[]string{"node", "type", "vmid", "name"}, nil,
+			"VM disk write in bytes",
+			[]string{"node", "vmid", "name"}, nil,
+		),
+
+		// LXC metrics
+		lxcStatus: prometheus.NewDesc(
+			"pve_lxc_status",
+			"LXC status (1=running, 0=stopped)",
+			[]string{"node", "vmid", "name"}, nil,
+		),
+		lxcUptime: prometheus.NewDesc(
+			"pve_lxc_uptime_seconds",
+			"LXC uptime in seconds",
+			[]string{"node", "vmid", "name"}, nil,
+		),
+		lxcCPU: prometheus.NewDesc(
+			"pve_lxc_cpu_usage",
+			"LXC CPU usage",
+			[]string{"node", "vmid", "name"}, nil,
+		),
+		lxcCPUs: prometheus.NewDesc(
+			"pve_lxc_cpus",
+			"Number of CPUs allocated to LXC",
+			[]string{"node", "vmid", "name"}, nil,
+		),
+		lxcMemory: prometheus.NewDesc(
+			"pve_lxc_memory_used_bytes",
+			"LXC memory usage in bytes",
+			[]string{"node", "vmid", "name"}, nil,
+		),
+		lxcMaxMemory: prometheus.NewDesc(
+			"pve_lxc_memory_max_bytes",
+			"LXC maximum memory in bytes",
+			[]string{"node", "vmid", "name"}, nil,
+		),
+		lxcDisk: prometheus.NewDesc(
+			"pve_lxc_disk_used_bytes",
+			"LXC disk usage in bytes",
+			[]string{"node", "vmid", "name"}, nil,
+		),
+		lxcMaxDisk: prometheus.NewDesc(
+			"pve_lxc_disk_max_bytes",
+			"LXC maximum disk in bytes",
+			[]string{"node", "vmid", "name"}, nil,
+		),
+		lxcNetIn: prometheus.NewDesc(
+			"pve_lxc_network_in_bytes_total",
+			"LXC network input in bytes",
+			[]string{"node", "vmid", "name"}, nil,
+		),
+		lxcNetOut: prometheus.NewDesc(
+			"pve_lxc_network_out_bytes_total",
+			"LXC network output in bytes",
+			[]string{"node", "vmid", "name"}, nil,
+		),
+		lxcDiskRead: prometheus.NewDesc(
+			"pve_lxc_disk_read_bytes_total",
+			"LXC disk read in bytes",
+			[]string{"node", "vmid", "name"}, nil,
+		),
+		lxcDiskWrite: prometheus.NewDesc(
+			"pve_lxc_disk_write_bytes_total",
+			"LXC disk write in bytes",
+			[]string{"node", "vmid", "name"}, nil,
 		),
 
 		// Storage metrics
@@ -218,6 +294,18 @@ func (c *ProxmoxCollector) Describe(ch chan<- *prometheus.Desc) {
 	ch <- c.vmNetOut
 	ch <- c.vmDiskRead
 	ch <- c.vmDiskWrite
+	ch <- c.lxcStatus
+	ch <- c.lxcUptime
+	ch <- c.lxcCPU
+	ch <- c.lxcCPUs
+	ch <- c.lxcMemory
+	ch <- c.lxcMaxMemory
+	ch <- c.lxcDisk
+	ch <- c.lxcMaxDisk
+	ch <- c.lxcNetIn
+	ch <- c.lxcNetOut
+	ch <- c.lxcDiskRead
+	ch <- c.lxcDiskWrite
 	ch <- c.storageTotal
 	ch <- c.storageUsed
 	ch <- c.storageAvail
@@ -424,20 +512,35 @@ func (c *ProxmoxCollector) collectResourceMetrics(ch chan<- prometheus.Metric, n
 			status = 1.0
 		}
 
-		labels := []string{node, resType, fmt.Sprintf("%d", vm.VMID), vm.Name}
+		labels := []string{node, fmt.Sprintf("%d", vm.VMID), vm.Name}
 
-		ch <- prometheus.MustNewConstMetric(c.vmStatus, prometheus.GaugeValue, status, labels...)
-		ch <- prometheus.MustNewConstMetric(c.vmUptime, prometheus.GaugeValue, vm.Uptime, labels...)
-		ch <- prometheus.MustNewConstMetric(c.vmCPU, prometheus.GaugeValue, vm.CPU, labels...)
-		ch <- prometheus.MustNewConstMetric(c.vmCPUs, prometheus.GaugeValue, vm.CPUs, labels...)
-		ch <- prometheus.MustNewConstMetric(c.vmMemory, prometheus.GaugeValue, vm.Mem, labels...)
-		ch <- prometheus.MustNewConstMetric(c.vmMaxMemory, prometheus.GaugeValue, vm.MaxMem, labels...)
-		ch <- prometheus.MustNewConstMetric(c.vmDisk, prometheus.GaugeValue, vm.Disk, labels...)
-		ch <- prometheus.MustNewConstMetric(c.vmMaxDisk, prometheus.GaugeValue, vm.MaxDisk, labels...)
-		ch <- prometheus.MustNewConstMetric(c.vmNetIn, prometheus.CounterValue, vm.NetIn, labels...)
-		ch <- prometheus.MustNewConstMetric(c.vmNetOut, prometheus.CounterValue, vm.NetOut, labels...)
-		ch <- prometheus.MustNewConstMetric(c.vmDiskRead, prometheus.CounterValue, vm.DiskRead, labels...)
-		ch <- prometheus.MustNewConstMetric(c.vmDiskWrite, prometheus.CounterValue, vm.DiskWrite, labels...)
+		if resType == "lxc" {
+			ch <- prometheus.MustNewConstMetric(c.lxcStatus, prometheus.GaugeValue, status, labels...)
+			ch <- prometheus.MustNewConstMetric(c.lxcUptime, prometheus.GaugeValue, vm.Uptime, labels...)
+			ch <- prometheus.MustNewConstMetric(c.lxcCPU, prometheus.GaugeValue, vm.CPU, labels...)
+			ch <- prometheus.MustNewConstMetric(c.lxcCPUs, prometheus.GaugeValue, vm.CPUs, labels...)
+			ch <- prometheus.MustNewConstMetric(c.lxcMemory, prometheus.GaugeValue, vm.Mem, labels...)
+			ch <- prometheus.MustNewConstMetric(c.lxcMaxMemory, prometheus.GaugeValue, vm.MaxMem, labels...)
+			ch <- prometheus.MustNewConstMetric(c.lxcDisk, prometheus.GaugeValue, vm.Disk, labels...)
+			ch <- prometheus.MustNewConstMetric(c.lxcMaxDisk, prometheus.GaugeValue, vm.MaxDisk, labels...)
+			ch <- prometheus.MustNewConstMetric(c.lxcNetIn, prometheus.CounterValue, vm.NetIn, labels...)
+			ch <- prometheus.MustNewConstMetric(c.lxcNetOut, prometheus.CounterValue, vm.NetOut, labels...)
+			ch <- prometheus.MustNewConstMetric(c.lxcDiskRead, prometheus.CounterValue, vm.DiskRead, labels...)
+			ch <- prometheus.MustNewConstMetric(c.lxcDiskWrite, prometheus.CounterValue, vm.DiskWrite, labels...)
+		} else {
+			ch <- prometheus.MustNewConstMetric(c.vmStatus, prometheus.GaugeValue, status, labels...)
+			ch <- prometheus.MustNewConstMetric(c.vmUptime, prometheus.GaugeValue, vm.Uptime, labels...)
+			ch <- prometheus.MustNewConstMetric(c.vmCPU, prometheus.GaugeValue, vm.CPU, labels...)
+			ch <- prometheus.MustNewConstMetric(c.vmCPUs, prometheus.GaugeValue, vm.CPUs, labels...)
+			ch <- prometheus.MustNewConstMetric(c.vmMemory, prometheus.GaugeValue, vm.Mem, labels...)
+			ch <- prometheus.MustNewConstMetric(c.vmMaxMemory, prometheus.GaugeValue, vm.MaxMem, labels...)
+			ch <- prometheus.MustNewConstMetric(c.vmDisk, prometheus.GaugeValue, vm.Disk, labels...)
+			ch <- prometheus.MustNewConstMetric(c.vmMaxDisk, prometheus.GaugeValue, vm.MaxDisk, labels...)
+			ch <- prometheus.MustNewConstMetric(c.vmNetIn, prometheus.CounterValue, vm.NetIn, labels...)
+			ch <- prometheus.MustNewConstMetric(c.vmNetOut, prometheus.CounterValue, vm.NetOut, labels...)
+			ch <- prometheus.MustNewConstMetric(c.vmDiskRead, prometheus.CounterValue, vm.DiskRead, labels...)
+			ch <- prometheus.MustNewConstMetric(c.vmDiskWrite, prometheus.CounterValue, vm.DiskWrite, labels...)
+		}
 	}
 }
 

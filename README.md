@@ -45,6 +45,63 @@ scrape_configs:
     scrape_interval: 30s
 ```
 
+## Metrics
+
+The exporter exposes the following metrics:
+
+### Node Metrics
+
+| Metric | Description |
+|--------|-------------|
+| `pve_node_up` | Node status (1=online) |
+| `pve_node_uptime_seconds` | Node uptime in seconds |
+| `pve_node_cpu_load` | Node CPU load |
+| `pve_node_memory_total_bytes` | Total memory in bytes |
+| `pve_node_memory_used_bytes` | Used memory in bytes |
+| `pve_node_memory_free_bytes` | Free memory in bytes |
+
+### VM Metrics (QEMU)
+
+| Metric | Description |
+|--------|-------------|
+| `pve_vm_status` | VM status (1=running, 0=stopped) |
+| `pve_vm_uptime_seconds` | VM uptime in seconds |
+| `pve_vm_cpu_usage` | VM CPU usage (0.0-1.0) |
+| `pve_vm_cpus` | Number of CPUs allocated |
+| `pve_vm_memory_used_bytes` | Used memory in bytes |
+| `pve_vm_memory_max_bytes` | Total memory in bytes |
+| `pve_vm_disk_used_bytes` | Used disk space in bytes |
+| `pve_vm_disk_max_bytes` | Total disk space in bytes |
+| `pve_vm_network_in_bytes_total` | Network input bytes |
+| `pve_vm_network_out_bytes_total` | Network output bytes |
+| `pve_vm_disk_read_bytes_total` | Disk read bytes |
+| `pve_vm_disk_write_bytes_total` | Disk write bytes |
+
+### LXC Metrics (Containers)
+
+| Metric | Description |
+|--------|-------------|
+| `pve_lxc_status` | LXC status (1=running, 0=stopped) |
+| `pve_lxc_uptime_seconds` | LXC uptime in seconds |
+| `pve_lxc_cpu_usage` | LXC CPU usage (0.0-1.0) |
+| `pve_lxc_cpus` | Number of CPUs allocated |
+| `pve_lxc_memory_used_bytes` | Used memory in bytes |
+| `pve_lxc_memory_max_bytes` | Total memory in bytes |
+| `pve_lxc_disk_used_bytes` | Used disk space in bytes |
+| `pve_lxc_disk_max_bytes` | Total disk space in bytes |
+| `pve_lxc_network_in_bytes_total` | Network input bytes |
+| `pve_lxc_network_out_bytes_total` | Network output bytes |
+| `pve_lxc_disk_read_bytes_total` | Disk read bytes |
+| `pve_lxc_disk_write_bytes_total` | Disk write bytes |
+
+### Storage Metrics
+
+| Metric | Description |
+|--------|-------------|
+| `pve_storage_total_bytes` | Total storage size in bytes |
+| `pve_storage_used_bytes` | Used storage in bytes |
+| `pve_storage_available_bytes` | Available storage in bytes |
+
 ## Authentication
 
 ### Password Authentication
