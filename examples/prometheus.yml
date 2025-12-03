@@ -1,0 +1,17 @@
+scrape_configs:
+  - job_name: 'proxmox'
+    static_configs:
+      - targets: ['pve-exporter:9221']
+        labels:
+          environment: 'production'
+          datacenter: 'dc1'
+    
+    scrape_interval: 30s
+    scrape_timeout: 10s
+    
+    # Optional: Add relabeling
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: instance
+        regex: '([^:]+)(?::\d+)?'
+        replacement: '$1'

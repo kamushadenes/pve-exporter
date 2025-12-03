@@ -1,0 +1,21 @@
+proxmox:
+  host: "proxmox.example.com"
+  port: 8006
+  user: "root@pam"
+  
+  # Use either password or token authentication
+  password: "your-password"
+  # token_id: "user@realm!tokenid"
+  # token_secret: "your-token-secret"
+  
+  realm: "pam"
+  insecure_skip_verify: true
+  timeout: 30s
+
+server:
+  listen_address: ":9221"
+  metrics_path: "/metrics"
+
+zfs:
+  enabled: true
+  kstat_path: "/proc/spl/kstat/zfs"
