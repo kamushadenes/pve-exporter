@@ -234,31 +234,6 @@ The exporter exposes the following metrics at `/metrics`.
 
 ### LXC Metrics (Containers)
 
-| Metric | Description |
-|--------|-------------|
-| `pve_lxc_status` | LXC status (1=running, 0=stopped) |
-| `pve_lxc_uptime_seconds` | LXC uptime in seconds |
-| `pve_lxc_cpu_usage` | LXC CPU usage (0.0-1.0) |
-| `pve_lxc_cpus` | Number of CPUs allocated |
-| `pve_lxc_memory_used_bytes` | Used memory in bytes |
-| `pve_lxc_memory_max_bytes` | Total memory in bytes |
-| `pve_lxc_disk_used_bytes` | Used disk space in bytes |
-| `pve_lxc_disk_max_bytes` | Total disk space in bytes |
-| `pve_lxc_swap_used_bytes` | Used swap in bytes |
-| `pve_lxc_swap_max_bytes` | Maximum swap in bytes |
-| `pve_lxc_network_in_bytes_total` | Network input bytes |
-| `pve_lxc_network_out_bytes_total` | Network output bytes |
-| `pve_lxc_disk_read_bytes_total` | Disk read bytes |
-| `pve_lxc_disk_write_bytes_total` | Disk write bytes |
-| `pve_lxc_ha_managed` | Managed by HA (1=yes) |
-| `pve_lxc_pid` | Process ID |
-| `pve_lxc_pressure_cpu_full` | CPU pressure full |
-| `pve_lxc_pressure_cpu_some` | CPU pressure some |
-| `pve_lxc_pressure_io_full` | I/O pressure full |
-| `pve_lxc_pressure_io_some` | I/O pressure some |
-| `pve_lxc_pressure_memory_full` | Memory pressure full |
-| `pve_lxc_pressure_memory_some` | Memory pressure some |
-| `pve_guest_last_backup_timestamp_seconds` | Timestamp of the last backup |
 
 ### Storage Metrics
 

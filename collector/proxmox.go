@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -128,6 +129,24 @@ type ProxmoxCollector struct {
 
 	// Backup metrics
 	guestLastBackup *prometheus.Desc
+
+	// ZFS metrics
+	zfsPoolHealth      *prometheus.Desc
+	zfsPoolSize        *prometheus.Desc
+	zfsPoolAlloc       *prometheus.Desc
+	zfsPoolFree        *prometheus.Desc
+	zfsPoolFrag        *prometheus.Desc
+	zfsARCSize         *prometheus.Desc
+	zfsARCMinSize      *prometheus.Desc
+	zfsARCMaxSize      *prometheus.Desc
+	zfsARCHits         *prometheus.Desc
+	zfsARCMisses       *prometheus.Desc
+	zfsARCHitRatio     *prometheus.Desc
+	zfsARCTargetSize   *prometheus.Desc
+	zfsARCL2Hits       *prometheus.Desc
+	zfsARCL2Misses     *prometheus.Desc
+	zfsARCL2Size       *prometheus.Desc
+	zfsARCL2HeaderSize *prometheus.Desc
 }
 
 // NewProxmoxCollector creates a new Proxmox collector
@@ -620,6 +639,88 @@ func NewProxmoxCollector(cfg *config.ProxmoxConfig) *ProxmoxCollector {
 			"Timestamp of the last backup",
 			[]string{"node", "vmid"}, nil,
 		),
+
+		// ZFS metrics
+		zfsPoolHealth: prometheus.NewDesc(
+			"pve_zfs_pool_health_status",
+			"ZFS pool health status (1=ONLINE, 0=Other)",
+			[]string{"node", "pool"}, nil,
+		),
+		zfsPoolSize: prometheus.NewDesc(
+			"pve_zfs_pool_size_bytes",
+			"ZFS pool total size in bytes",
+			[]string{"node", "pool"}, nil,
+		),
+		zfsPoolAlloc: prometheus.NewDesc(
+			"pve_zfs_pool_alloc_bytes",
+			"ZFS pool allocated size in bytes",
+			[]string{"node", "pool"}, nil,
+		),
+		zfsPoolFree: prometheus.NewDesc(
+			"pve_zfs_pool_free_bytes",
+			"ZFS pool free size in bytes",
+			[]string{"node", "pool"}, nil,
+		),
+		zfsPoolFrag: prometheus.NewDesc(
+			"pve_zfs_pool_frag_percent",
+			"ZFS pool fragmentation percentage",
+			[]string{"node", "pool"}, nil,
+		),
+		zfsARCSize: prometheus.NewDesc(
+			"pve_zfs_arc_size_bytes",
+			"ZFS ARC size in bytes",
+			[]string{"node"}, nil,
+		),
+		zfsARCMinSize: prometheus.NewDesc(
+			"pve_zfs_arc_min_size_bytes",
+			"ZFS ARC minimum size in bytes",
+			[]string{"node"}, nil,
+		),
+		zfsARCMaxSize: prometheus.NewDesc(
+			"pve_zfs_arc_max_size_bytes",
+			"ZFS ARC maximum size in bytes",
+			[]string{"node"}, nil,
+		),
+		zfsARCHits: prometheus.NewDesc(
+			"pve_zfs_arc_hits_total",
+			"ZFS ARC hits total",
+			[]string{"node"}, nil,
+		),
+		zfsARCMisses: prometheus.NewDesc(
+			"pve_zfs_arc_misses_total",
+			"ZFS ARC misses total",
+			[]string{"node"}, nil,
+		),
+		zfsARCHitRatio: prometheus.NewDesc(
+			"pve_zfs_arc_hit_ratio",
+			"ZFS ARC hit ratio",
+			[]string{"node"}, nil,
+		),
+		zfsARCTargetSize: prometheus.NewDesc(
+			"pve_zfs_arc_target_size_bytes",
+			"ZFS ARC target size (c) in bytes",
+			[]string{"node"}, nil,
+		),
+		zfsARCL2Hits: prometheus.NewDesc(
+			"pve_zfs_arc_l2_hits_total",
+			"ZFS L2ARC hits total",
+			[]string{"node"}, nil,
+		),
+		zfsARCL2Misses: prometheus.NewDesc(
+			"pve_zfs_arc_l2_misses_total",
+			"ZFS L2ARC misses total",
+			[]string{"node"}, nil,
+		),
+		zfsARCL2Size: prometheus.NewDesc(
+			"pve_zfs_arc_l2_size_bytes",
+			"ZFS L2ARC size in bytes",
+			[]string{"node"}, nil,
+		),
+		zfsARCL2HeaderSize: prometheus.NewDesc(
+			"pve_zfs_arc_l2_header_size_bytes",
+			"ZFS L2ARC header size in bytes",
+			[]string{"node"}, nil,
+		),
 	}
 }
 
@@ -717,12 +818,29 @@ func (c *ProxmoxCollector) Describe(ch chan<- *prometheus.Desc) {
 	ch <- c.storageShared
 	ch <- c.storageUsedFraction
 	ch <- c.guestLastBackup
+	ch <- c.zfsPoolHealth
+	ch <- c.zfsPoolSize
+	ch <- c.zfsPoolAlloc
+	ch <- c.zfsPoolFree
+	ch <- c.zfsPoolFrag
+	ch <- c.zfsARCSize
+	ch <- c.zfsARCMinSize
+	ch <- c.zfsARCMaxSize
+	ch <- c.zfsARCHits
+	ch <- c.zfsARCMisses
+	ch <- c.zfsARCHitRatio
+	ch <- c.zfsARCTargetSize
+	ch <- c.zfsARCL2Hits
+	ch <- c.zfsARCL2Misses
+	ch <- c.zfsARCL2Size
+	ch <- c.zfsARCL2HeaderSize
 }
 
 // Collect implements prometheus.Collector
 func (c *ProxmoxCollector) Collect(ch chan<- prometheus.Metric) {
 	// Authenticate if needed
 	if err := c.authenticate(); err != nil {
+		log.Printf("Error during authentication: %v", err)
 		return
 	}
 
@@ -737,6 +855,9 @@ func (c *ProxmoxCollector) Collect(ch chan<- prometheus.Metric) {
 
 	// Collect backup metrics
 	c.collectBackupMetrics(ch)
+
+	// Collect ZFS metrics
+	c.collectZFSMetrics(ch)
 }
 
 // authenticate authenticates with Proxmox API
@@ -819,6 +940,7 @@ func (c *ProxmoxCollector) apiRequest(path string) ([]byte, error) {
 func (c *ProxmoxCollector) collectNodeMetrics(ch chan<- prometheus.Metric) {
 	data, err := c.apiRequest("/nodes")
 	if err != nil {
+		log.Printf("Error fetching nodes: %v", err)
 		return
 	}
 
@@ -838,6 +960,7 @@ func (c *ProxmoxCollector) collectNodeMetrics(ch chan<- prometheus.Metric) {
 	}
 
 	if err := json.Unmarshal(data, &result); err != nil {
+		log.Printf("Error unmarshaling nodes data: %v", err)
 		return
 	}
 
@@ -865,6 +988,7 @@ func (c *ProxmoxCollector) collectNodeDetailedMetrics(ch chan<- prometheus.Metri
 	path := fmt.Sprintf("/nodes/%s/status", nodeName)
 	data, err := c.apiRequest(path)
 	if err != nil {
+		log.Printf("Error fetching node status for %s: %v", nodeName, err)
 		return
 	}
 
@@ -895,6 +1019,7 @@ func (c *ProxmoxCollector) collectNodeDetailedMetrics(ch chan<- prometheus.Metri
 	}
 
 	if err := json.Unmarshal(data, &result); err != nil {
+		log.Printf("Error unmarshaling node status for %s: %v", nodeName, err)
 		return
 	}
 
@@ -943,6 +1068,7 @@ func (c *ProxmoxCollector) collectVMMetrics(ch chan<- prometheus.Metric) {
 	// Get list of nodes first
 	nodesData, err := c.apiRequest("/nodes")
 	if err != nil {
+		log.Printf("Error fetching nodes for VM metrics: %v", err)
 		return
 	}
 
@@ -953,6 +1079,7 @@ func (c *ProxmoxCollector) collectVMMetrics(ch chan<- prometheus.Metric) {
 	}
 
 	if err := json.Unmarshal(nodesData, &nodesResult); err != nil {
+		log.Printf("Error unmarshaling nodes for VM metrics: %v", err)
 		return
 	}
 
@@ -973,6 +1100,7 @@ func (c *ProxmoxCollector) collectResourceMetrics(ch chan<- prometheus.Metric, n
 	path := fmt.Sprintf("/nodes/%s/%s", node, resType)
 	data, err := c.apiRequest(path)
 	if err != nil {
+		log.Printf("Error fetching %s for node %s: %v", resType, node, err)
 		return 0
 	}
 
@@ -996,6 +1124,7 @@ func (c *ProxmoxCollector) collectResourceMetrics(ch chan<- prometheus.Metric, n
 	}
 
 	if err := json.Unmarshal(data, &result); err != nil {
+		log.Printf("Error unmarshaling %s for node %s: %v", resType, node, err)
 		return 0
 	}
 
@@ -1066,6 +1195,7 @@ func (c *ProxmoxCollector) collectVMDetailedMetrics(ch chan<- prometheus.Metric,
 	path := fmt.Sprintf("/nodes/%s/qemu/%d/status/current", node, vmid)
 	data, err := c.apiRequest(path)
 	if err != nil {
+		log.Printf("Error fetching detailed VM metrics for %d on %s: %v", vmid, node, err)
 		return
 	}
 
@@ -1110,6 +1240,7 @@ func (c *ProxmoxCollector) collectVMDetailedMetrics(ch chan<- prometheus.Metric,
 	}
 
 	if err := json.Unmarshal(data, &result); err != nil {
+		log.Printf("Error unmarshaling detailed VM metrics for %d on %s: %v", vmid, node, err)
 		return
 	}
 
@@ -1159,6 +1290,7 @@ func (c *ProxmoxCollector) collectLXCSwapMetrics(ch chan<- prometheus.Metric, no
 	path := fmt.Sprintf("/nodes/%s/lxc/%d/status/current", node, vmid)
 	data, err := c.apiRequest(path)
 	if err != nil {
+		log.Printf("Error fetching LXC swap metrics for %d on %s: %v", vmid, node, err)
 		return
 	}
 
@@ -1180,6 +1312,7 @@ func (c *ProxmoxCollector) collectLXCSwapMetrics(ch chan<- prometheus.Metric, no
 	}
 
 	if err := json.Unmarshal(data, &result); err != nil {
+		log.Printf("Error unmarshaling LXC swap metrics for %d on %s: %v", vmid, node, err)
 		return
 	}
 
@@ -1213,6 +1346,7 @@ func (c *ProxmoxCollector) collectStorageMetrics(ch chan<- prometheus.Metric) {
 	// Get list of nodes
 	nodesData, err := c.apiRequest("/nodes")
 	if err != nil {
+		log.Printf("Error fetching nodes for storage metrics: %v", err)
 		return
 	}
 
@@ -1223,6 +1357,7 @@ func (c *ProxmoxCollector) collectStorageMetrics(ch chan<- prometheus.Metric) {
 	}
 
 	if err := json.Unmarshal(nodesData, &nodesResult); err != nil {
+		log.Printf("Error unmarshaling nodes for storage metrics: %v", err)
 		return
 	}
 
@@ -1230,6 +1365,7 @@ func (c *ProxmoxCollector) collectStorageMetrics(ch chan<- prometheus.Metric) {
 		path := fmt.Sprintf("/nodes/%s/storage", node.Node)
 		data, err := c.apiRequest(path)
 		if err != nil {
+			log.Printf("Error fetching storage for node %s: %v", node.Node, err)
 			continue
 		}
 
@@ -1248,6 +1384,7 @@ func (c *ProxmoxCollector) collectStorageMetrics(ch chan<- prometheus.Metric) {
 		}
 
 		if err := json.Unmarshal(data, &result); err != nil {
+			log.Printf("Error unmarshaling storage for node %s: %v", node.Node, err)
 			continue
 		}
 
@@ -1269,6 +1406,7 @@ func (c *ProxmoxCollector) collectBackupMetrics(ch chan<- prometheus.Metric) {
 	// Get list of nodes
 	nodesData, err := c.apiRequest("/nodes")
 	if err != nil {
+		log.Printf("Error fetching nodes for backup metrics: %v", err)
 		return
 	}
 
@@ -1279,6 +1417,7 @@ func (c *ProxmoxCollector) collectBackupMetrics(ch chan<- prometheus.Metric) {
 	}
 
 	if err := json.Unmarshal(nodesData, &nodesResult); err != nil {
+		log.Printf("Error unmarshaling nodes for backup metrics: %v", err)
 		return
 	}
 
@@ -1287,6 +1426,7 @@ func (c *ProxmoxCollector) collectBackupMetrics(ch chan<- prometheus.Metric) {
 		storagePath := fmt.Sprintf("/nodes/%s/storage", node.Node)
 		storageData, err := c.apiRequest(storagePath)
 		if err != nil {
+			log.Printf("Error fetching storage for backup metrics on node %s: %v", node.Node, err)
 			continue
 		}
 
@@ -1298,6 +1438,7 @@ func (c *ProxmoxCollector) collectBackupMetrics(ch chan<- prometheus.Metric) {
 		}
 
 		if err := json.Unmarshal(storageData, &storageResult); err != nil {
+			log.Printf("Error unmarshaling storage for backup metrics on node %s: %v", node.Node, err)
 			continue
 		}
 
@@ -1308,6 +1449,7 @@ func (c *ProxmoxCollector) collectBackupMetrics(ch chan<- prometheus.Metric) {
 			contentPath := fmt.Sprintf("/nodes/%s/storage/%s/content?content=backup", node.Node, storage.Storage)
 			contentData, err := c.apiRequest(contentPath)
 			if err != nil {
+				log.Printf("Error fetching backup content for storage %s on node %s: %v", storage.Storage, node.Node, err)
 				continue
 			}
 
@@ -1320,6 +1462,7 @@ func (c *ProxmoxCollector) collectBackupMetrics(ch chan<- prometheus.Metric) {
 			}
 
 			if err := json.Unmarshal(contentData, &contentResult); err != nil {
+				log.Printf("Error unmarshaling backup content for storage %s on node %s: %v", storage.Storage, node.Node, err)
 				continue
 			}
 
