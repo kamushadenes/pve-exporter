@@ -31,6 +31,20 @@ chmod +x pve-exporter-linux-amd64
 ./pve-exporter-linux-amd64 -config config.yml
 ```
 
+### CLI Commands
+
+| Command | Description |
+|---------|-------------|
+| `--version` | Print version and exit |
+| `--selfupdate` | Update to latest version from GitHub and restart service |
+
+**Self-update example:**
+```bash
+# Update to latest version (requires root and systemd)
+pve-exporter --selfupdate
+```
+
+
 ## 🔧 Systemd Service Installation
 
 For production use, install the exporter as a systemd service running under a dedicated user.

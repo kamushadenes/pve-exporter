@@ -1,6 +1,7 @@
 package main
 
 import (
+	"flag"
 	"fmt"
 	"log"
 	"net/http"
@@ -21,6 +22,25 @@ var (
 )
 
 func main() {
+	// CLI flags
+	showVersion := flag.Bool("version", false, "Print version and exit")
+	selfUpdate := flag.Bool("selfupdate", false, "Update to latest version and restart")
+	flag.Parse()
+
+	// Handle --version
+	if *showVersion {
+		fmt.Printf("pve-exporter version=%s commit=%s date=%s\n", version, commit, date)
+		os.Exit(0)
+	}
+
+	// Handle --selfupdate
+	if *selfUpdate {
+		if err := SelfUpdate(version); err != nil {
+			log.Fatalf("Self-update failed: %v", err)
+		}
+		os.Exit(0)
+	}
+
 	log.Printf("Starting pve-exporter version=%s commit=%s date=%s", version, commit, date)
 
 	// Load configuration
