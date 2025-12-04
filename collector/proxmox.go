@@ -978,16 +978,6 @@ func (c *ProxmoxCollector) apiRequest(path string) ([]byte, error) {
 	return io.ReadAll(resp.Body)
 }
 
-// collectNodeMetrics collects node-level metrics
-func (c *ProxmoxCollector) collectNodeMetrics(ch chan<- prometheus.Metric) {
-	data, err := c.apiRequest("/nodes")
-	if err != nil {
-		log.Printf("Error fetching nodes: %v", err)
-		return
-	}
-	c.collectNodeMetricsWithNodes(ch, data)
-}
-
 // collectNodeMetricsWithNodes collects node-level metrics from pre-fetched data
 func (c *ProxmoxCollector) collectNodeMetricsWithNodes(ch chan<- prometheus.Metric, data []byte) {
 	var result struct {
@@ -1107,33 +1097,6 @@ func (c *ProxmoxCollector) collectNodeDetailedMetrics(ch chan<- prometheus.Metri
 	ch <- prometheus.MustNewConstMetric(c.nodeSwapTotal, prometheus.GaugeValue, result.Data.Swap.Total, nodeName)
 	ch <- prometheus.MustNewConstMetric(c.nodeSwapUsed, prometheus.GaugeValue, result.Data.Swap.Used, nodeName)
 	ch <- prometheus.MustNewConstMetric(c.nodeSwapFree, prometheus.GaugeValue, result.Data.Swap.Free, nodeName)
-}
-
-// collectVMMetrics collects VM and container metrics
-func (c *ProxmoxCollector) collectVMMetrics(ch chan<- prometheus.Metric) {
-	// Get list of nodes first
-	nodesData, err := c.apiRequest("/nodes")
-	if err != nil {
-		log.Printf("Error fetching nodes for VM metrics: %v", err)
-		return
-	}
-
-	var nodesResult struct {
-		Data []struct {
-			Node string `json:"node"`
-		} `json:"data"`
-	}
-
-	if err := json.Unmarshal(nodesData, &nodesResult); err != nil {
-		log.Printf("Error unmarshaling nodes for VM metrics: %v", err)
-		return
-	}
-
-	nodes := make([]string, len(nodesResult.Data))
-	for i, n := range nodesResult.Data {
-		nodes[i] = n.Node
-	}
-	c.collectVMMetricsWithNodes(ch, nodes)
 }
 
 // collectVMMetricsWithNodes collects VM and container metrics using pre-fetched nodes list
@@ -1270,112 +1233,6 @@ func (c *ProxmoxCollector) collectResourceMetrics(ch chan<- prometheus.Metric, n
 
 	wg.Wait()
 	return len(result.Data)
-}
-
-// collectVMDetailedMetrics fetches detailed VM metrics (balloon, freemem, HA, pressure, ballooninfo)
-func (c *ProxmoxCollector) collectVMDetailedMetrics(ch chan<- prometheus.Metric, node string, vmid int64, labels []string) {
-	path := fmt.Sprintf("/nodes/%s/qemu/%d/status/current", node, vmid)
-	data, err := c.apiRequest(path)
-	if err != nil {
-		log.Printf("Error fetching detailed VM metrics for %d on %s: %v", vmid, node, err)
-		return
-	}
-
-	var result struct {
-		Data struct {
-			Balloon float64 `json:"balloon"`
-			FreeMem float64 `json:"freemem"`
-			PID     float64 `json:"pid"`
-			MemHost float64 `json:"memhost"`
-			HA      struct {
-				Managed int `json:"managed"`
-			} `json:"ha"`
-			BalloonInfo struct {
-				Actual          float64 `json:"actual"`
-				MaxMem          float64 `json:"max_mem"`
-				TotalMem        float64 `json:"total_mem"`
-				MajorPageFaults float64 `json:"major_page_faults"`
-				MinorPageFaults float64 `json:"minor_page_faults"`
-				MemSwappedIn    float64 `json:"mem_swapped_in"`
-				MemSwappedOut   float64 `json:"mem_swapped_out"`
-			} `json:"ballooninfo"`
-			PressureCPUFull    float64 `json:"pressurecpufull"`
-			PressureCPUSome    float64 `json:"pressurecpusome"`
-			PressureIOFull     float64 `json:"pressureiofull"`
-			PressureIOSome     float64 `json:"pressureiosome"`
-			PressureMemoryFull float64 `json:"pressurememoryfull"`
-			PressureMemorySome float64 `json:"pressurememorysome"`
-			BlockStat          map[string]struct {
-				RdBytes     float64 `json:"rd_bytes"`
-				WrBytes     float64 `json:"wr_bytes"`
-				RdOps       float64 `json:"rd_operations"`
-				WrOps       float64 `json:"wr_operations"`
-				FailedRdOps float64 `json:"failed_rd_operations"`
-				FailedWrOps float64 `json:"failed_wr_operations"`
-				FlushOps    float64 `json:"flush_operations"`
-			} `json:"blockstat"`
-			NICS map[string]struct {
-				NetIn  float64 `json:"netin"`
-				NetOut float64 `json:"netout"`
-			} `json:"nics"`
-		} `json:"data"`
-	}
-
-	if err := json.Unmarshal(data, &result); err != nil {
-		log.Printf("Error unmarshaling detailed VM metrics for %d on %s: %v", vmid, node, err)
-		return
-	}
-
-	ch <- prometheus.MustNewConstMetric(c.vmBalloon, prometheus.GaugeValue, result.Data.Balloon, labels...)
-	ch <- prometheus.MustNewConstMetric(c.vmFreeMem, prometheus.GaugeValue, result.Data.FreeMem, labels...)
-	ch <- prometheus.MustNewConstMetric(c.vmHAManaged, prometheus.GaugeValue, float64(result.Data.HA.Managed), labels...)
-	ch <- prometheus.MustNewConstMetric(c.vmPID, prometheus.GaugeValue, result.Data.PID, labels...)
-	ch <- prometheus.MustNewConstMetric(c.vmMemHost, prometheus.GaugeValue, result.Data.MemHost, labels...)
-	// Pressure metrics
-	ch <- prometheus.MustNewConstMetric(c.vmPressureCPUFull, prometheus.GaugeValue, result.Data.PressureCPUFull, labels...)
-	ch <- prometheus.MustNewConstMetric(c.vmPressureCPUSome, prometheus.GaugeValue, result.Data.PressureCPUSome, labels...)
-	ch <- prometheus.MustNewConstMetric(c.vmPressureIOFull, prometheus.GaugeValue, result.Data.PressureIOFull, labels...)
-	ch <- prometheus.MustNewConstMetric(c.vmPressureIOSome, prometheus.GaugeValue, result.Data.PressureIOSome, labels...)
-	ch <- prometheus.MustNewConstMetric(c.vmPressureMemoryFull, prometheus.GaugeValue, result.Data.PressureMemoryFull, labels...)
-	ch <- prometheus.MustNewConstMetric(c.vmPressureMemorySome, prometheus.GaugeValue, result.Data.PressureMemorySome, labels...)
-	// Balloon info
-	ch <- prometheus.MustNewConstMetric(c.vmBalloonActual, prometheus.GaugeValue, result.Data.BalloonInfo.Actual, labels...)
-	ch <- prometheus.MustNewConstMetric(c.vmBalloonMaxMem, prometheus.GaugeValue, result.Data.BalloonInfo.MaxMem, labels...)
-	ch <- prometheus.MustNewConstMetric(c.vmBalloonTotalMem, prometheus.GaugeValue, result.Data.BalloonInfo.TotalMem, labels...)
-	ch <- prometheus.MustNewConstMetric(c.vmBalloonMajorFaults, prometheus.CounterValue, result.Data.BalloonInfo.MajorPageFaults, labels...)
-	ch <- prometheus.MustNewConstMetric(c.vmBalloonMinorFaults, prometheus.CounterValue, result.Data.BalloonInfo.MinorPageFaults, labels...)
-	ch <- prometheus.MustNewConstMetric(c.vmBalloonMemSwappedIn, prometheus.GaugeValue, result.Data.BalloonInfo.MemSwappedIn, labels...)
-	ch <- prometheus.MustNewConstMetric(c.vmBalloonMemSwappedOut, prometheus.GaugeValue, result.Data.BalloonInfo.MemSwappedOut, labels...)
-
-	// Block device metrics
-	for device, stats := range result.Data.BlockStat {
-		deviceLabels := append(labels, device)
-		ch <- prometheus.MustNewConstMetric(c.vmBlockReadBytes, prometheus.CounterValue, stats.RdBytes, deviceLabels...)
-		ch <- prometheus.MustNewConstMetric(c.vmBlockWriteBytes, prometheus.CounterValue, stats.WrBytes, deviceLabels...)
-		ch <- prometheus.MustNewConstMetric(c.vmBlockReadOps, prometheus.CounterValue, stats.RdOps, deviceLabels...)
-		ch <- prometheus.MustNewConstMetric(c.vmBlockWriteOps, prometheus.CounterValue, stats.WrOps, deviceLabels...)
-		ch <- prometheus.MustNewConstMetric(c.vmBlockFailedRead, prometheus.CounterValue, stats.FailedRdOps, deviceLabels...)
-		ch <- prometheus.MustNewConstMetric(c.vmBlockFailedWrite, prometheus.CounterValue, stats.FailedWrOps, deviceLabels...)
-		ch <- prometheus.MustNewConstMetric(c.vmBlockFlushOps, prometheus.CounterValue, stats.FlushOps, deviceLabels...)
-	}
-
-	// NIC metrics
-	for iface, stats := range result.Data.NICS {
-		nicLabels := append(labels, iface)
-		ch <- prometheus.MustNewConstMetric(c.vmNICNetIn, prometheus.CounterValue, stats.NetIn, nicLabels...)
-		ch <- prometheus.MustNewConstMetric(c.vmNICNetOut, prometheus.CounterValue, stats.NetOut, nicLabels...)
-	}
-}
-
-// collectLXCSwapMetrics fetches swap, HA, PID, and pressure metrics for LXC containers
-func (c *ProxmoxCollector) collectLXCSwapMetrics(ch chan<- prometheus.Metric, node string, vmid int64, labels []string) {
-	path := fmt.Sprintf("/nodes/%s/lxc/%d/status/current", node, vmid)
-	data, err := c.apiRequest(path)
-	if err != nil {
-		log.Printf("Error fetching LXC swap metrics for %d on %s: %v", vmid, node, err)
-		return
-	}
-	c.collectLXCSwapMetricsFromData(ch, data, labels)
 }
 
 // collectLXCSwapMetricsFromData parses LXC swap metrics from already fetched data
@@ -1521,33 +1378,6 @@ func (c *ProxmoxCollector) collectVMDetailedMetricsFromData(ch chan<- prometheus
 	}
 }
 
-// collectStorageMetrics collects storage metrics
-func (c *ProxmoxCollector) collectStorageMetrics(ch chan<- prometheus.Metric) {
-	// Get list of nodes
-	nodesData, err := c.apiRequest("/nodes")
-	if err != nil {
-		log.Printf("Error fetching nodes for storage metrics: %v", err)
-		return
-	}
-
-	var nodesResult struct {
-		Data []struct {
-			Node string `json:"node"`
-		} `json:"data"`
-	}
-
-	if err := json.Unmarshal(nodesData, &nodesResult); err != nil {
-		log.Printf("Error unmarshaling nodes for storage metrics: %v", err)
-		return
-	}
-
-	nodes := make([]string, len(nodesResult.Data))
-	for i, n := range nodesResult.Data {
-		nodes[i] = n.Node
-	}
-	c.collectStorageMetricsWithNodes(ch, nodes)
-}
-
 // collectStorageMetricsWithNodes collects storage metrics using pre-fetched nodes list
 func (c *ProxmoxCollector) collectStorageMetricsWithNodes(ch chan<- prometheus.Metric, nodes []string) {
 	for _, node := range nodes {
@@ -1588,33 +1418,6 @@ func (c *ProxmoxCollector) collectStorageMetricsWithNodes(ch chan<- prometheus.M
 			ch <- prometheus.MustNewConstMetric(c.storageUsedFraction, prometheus.GaugeValue, storage.UsedFraction, labels...)
 		}
 	}
-}
-
-// collectBackupMetrics collects backup timestamp metrics
-func (c *ProxmoxCollector) collectBackupMetrics(ch chan<- prometheus.Metric) {
-	// Get list of nodes
-	nodesData, err := c.apiRequest("/nodes")
-	if err != nil {
-		log.Printf("Error fetching nodes for backup metrics: %v", err)
-		return
-	}
-
-	var nodesResult struct {
-		Data []struct {
-			Node string `json:"node"`
-		} `json:"data"`
-	}
-
-	if err := json.Unmarshal(nodesData, &nodesResult); err != nil {
-		log.Printf("Error unmarshaling nodes for backup metrics: %v", err)
-		return
-	}
-
-	nodes := make([]string, len(nodesResult.Data))
-	for i, n := range nodesResult.Data {
-		nodes[i] = n.Node
-	}
-	c.collectBackupMetricsWithNodes(ch, nodes)
 }
 
 // collectBackupMetricsWithNodes collects backup timestamp metrics using pre-fetched nodes list

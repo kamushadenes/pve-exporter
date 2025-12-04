@@ -12,64 +12,10 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 )
 
-// collectZFSMetrics collects ZFS pool and ARC metrics
-func (c *ProxmoxCollector) collectZFSMetrics(ch chan<- prometheus.Metric) {
-	// Get list of nodes
-	nodesData, err := c.apiRequest("/nodes")
-	if err != nil {
-		log.Printf("Error fetching nodes for ZFS metrics: %v", err)
-		return
-	}
-
-	var nodesResult struct {
-		Data []struct {
-			Node string `json:"node"`
-		} `json:"data"`
-	}
-
-	if err := json.Unmarshal(nodesData, &nodesResult); err != nil {
-		log.Printf("Error unmarshaling nodes for ZFS metrics: %v", err)
-		return
-	}
-
-	nodes := make([]string, len(nodesResult.Data))
-	for i, n := range nodesResult.Data {
-		nodes[i] = n.Node
-	}
-	c.collectZFSMetricsWithNodes(ch, nodes)
-}
-
 // collectZFSMetricsWithNodes collects ZFS metrics using pre-fetched nodes list
 func (c *ProxmoxCollector) collectZFSMetricsWithNodes(ch chan<- prometheus.Metric, nodes []string) {
 	c.collectZFSPoolMetricsWithNodes(ch, nodes)
 	c.collectZFSARCMetrics(ch)
-}
-
-// collectZFSPoolMetrics collects ZFS pool metrics from Proxmox API
-func (c *ProxmoxCollector) collectZFSPoolMetrics(ch chan<- prometheus.Metric) {
-	// Get list of nodes
-	nodesData, err := c.apiRequest("/nodes")
-	if err != nil {
-		log.Printf("Error fetching nodes for ZFS metrics: %v", err)
-		return
-	}
-
-	var nodesResult struct {
-		Data []struct {
-			Node string `json:"node"`
-		} `json:"data"`
-	}
-
-	if err := json.Unmarshal(nodesData, &nodesResult); err != nil {
-		log.Printf("Error unmarshaling nodes for ZFS metrics: %v", err)
-		return
-	}
-
-	nodes := make([]string, len(nodesResult.Data))
-	for i, n := range nodesResult.Data {
-		nodes[i] = n.Node
-	}
-	c.collectZFSPoolMetricsWithNodes(ch, nodes)
 }
 
 // collectZFSPoolMetricsWithNodes collects ZFS pool metrics using pre-fetched nodes list
