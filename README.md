@@ -38,11 +38,16 @@ chmod +x pve-exporter-linux-amd64
 | `--version` | Print version and exit |
 | `--selfupdate` | Update to latest version from GitHub and restart service |
 
-**Self-update example:**
+**Self-update:**
 ```bash
-# Update to latest version (requires root and systemd)
-pve-exporter --selfupdate
+# Update to latest version (run as root)
+sudo pve-exporter --selfupdate
 ```
+
+> **Note:** `--selfupdate` requires root privileges because it:
+> - Replaces the binary in `/usr/local/bin/`
+> - Runs `systemctl restart pve-exporter` to apply the update
+
 
 
 ## 🔧 Systemd Service Installation
