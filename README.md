@@ -11,8 +11,8 @@ A professional Prometheus exporter for Proxmox VE, written in Go. It collects co
 
 - **Comprehensive Metrics**:
   - **Node**: CPU, Memory, Uptime, Status, VM/LXC counts.
-  - **VM (QEMU)**: CPU, Memory, Disk, Network I/O, Uptime, Status, Backup timestamps.
-  - **LXC Containers**: CPU, Memory, Disk, Network I/O, Uptime, Status, Backup timestamps.
+  - **VM (QEMU)**: CPU, Memory, Disk, Network I/O, Uptime, Status.
+  - **LXC Containers**: CPU, Memory, Disk, Network I/O, Uptime, Status.
   - **Storage**: Usage, Availability, Total size.
 - **Secure**: Supports API Token authentication (recommended) and standard password auth.
 - **Lightweight**: Single static binary, runs as systemd service.
@@ -178,7 +178,6 @@ Or import manually from [`grafana/pve-exporter.json`](grafana/pve-exporter.json)
 - Network and Disk I/O graphs
 - Storage usage visualization
 - ZFS pool health, fragmentation, and ARC statistics
-- Backup monitoring with age alerts
 
 ## 📊 Metrics
 
@@ -255,7 +254,6 @@ The exporter exposes the following metrics at `/metrics`.
 | `pve_vm_block_flush_ops_total` | Block device flush ops (label: device) |
 | `pve_vm_nic_in_bytes_total` | NIC input bytes (label: interface) |
 | `pve_vm_nic_out_bytes_total` | NIC output bytes (label: interface) |
-| `pve_guest_last_backup_timestamp_seconds` | Timestamp of the last backup |
 
 ### LXC Metrics (Containers)
 
@@ -283,7 +281,6 @@ The exporter exposes the following metrics at `/metrics`.
 | `pve_lxc_pressure_io_some` | I/O pressure some |
 | `pve_lxc_pressure_memory_full` | Memory pressure full |
 | `pve_lxc_pressure_memory_some` | Memory pressure some |
-| `pve_guest_last_backup_timestamp_seconds` | Timestamp of the last backup |
 
 ### Storage Metrics
 

@@ -9,7 +9,6 @@ import (
 	"net/http"
 	"net/url"
 	"strconv"
-	"strings"
 	"sync"
 
 	"github.com/bigtcze/pve-exporter/config"
@@ -127,9 +126,6 @@ type ProxmoxCollector struct {
 	storageEnabled      *prometheus.Desc
 	storageShared       *prometheus.Desc
 	storageUsedFraction *prometheus.Desc
-
-	// Backup metrics
-	guestLastBackup *prometheus.Desc
 
 	// ZFS metrics
 	zfsPoolHealth      *prometheus.Desc
@@ -634,13 +630,6 @@ func NewProxmoxCollector(cfg *config.ProxmoxConfig) *ProxmoxCollector {
 			[]string{"node", "storage", "type"}, nil,
 		),
 
-		// Backup metrics
-		guestLastBackup: prometheus.NewDesc(
-			"pve_guest_last_backup_timestamp_seconds",
-			"Timestamp of the last backup",
-			[]string{"node", "vmid"}, nil,
-		),
-
 		// ZFS metrics
 		zfsPoolHealth: prometheus.NewDesc(
 			"pve_zfs_pool_health_status",
@@ -818,7 +807,7 @@ func (c *ProxmoxCollector) Describe(ch chan<- *prometheus.Desc) {
 	ch <- c.storageEnabled
 	ch <- c.storageShared
 	ch <- c.storageUsedFraction
-	ch <- c.guestLastBackup
+
 	ch <- c.zfsPoolHealth
 	ch <- c.zfsPoolSize
 	ch <- c.zfsPoolAlloc
@@ -886,8 +875,7 @@ func (c *ProxmoxCollector) Collect(ch chan<- prometheus.Metric) {
 
 	go func() {
 		defer wg.Done()
-		// Combined: collect storage metrics AND backup metrics using shared storage data
-		c.collectStorageAndBackupMetrics(ch, nodes)
+		c.collectStorageMetrics(ch, nodes)
 	}()
 
 	go func() {
@@ -1387,22 +1375,14 @@ func (c *ProxmoxCollector) collectVMDetailedMetricsFromData(ch chan<- prometheus
 	}
 }
 
-// collectStorageAndBackupMetrics combines storage and backup metric collection to avoid duplicate API calls
-// This function fetches /nodes/{node}/storage only ONCE per node and reuses the data
-func (c *ProxmoxCollector) collectStorageAndBackupMetrics(ch chan<- prometheus.Metric, nodes []string) {
-	// Track latest backup per VM across all storages (global across all nodes)
-	// Use mutex for concurrent access from goroutines
-	var backupMutex sync.Mutex
-	globalLastBackups := make(map[string]int64)
-
-	// Process all nodes in parallel
+// collectStorageMetrics collects storage metrics for all nodes in parallel
+func (c *ProxmoxCollector) collectStorageMetrics(ch chan<- prometheus.Metric, nodes []string) {
 	var wg sync.WaitGroup
 	for _, node := range nodes {
 		wg.Add(1)
 		go func(nodeName string) {
 			defer wg.Done()
 
-			// Fetch storage data ONCE - used for both storage metrics and backup discovery
 			path := fmt.Sprintf("/nodes/%s/storage", nodeName)
 			storageData, err := c.apiRequest(path)
 			if err != nil {
@@ -1410,12 +1390,10 @@ func (c *ProxmoxCollector) collectStorageAndBackupMetrics(ch chan<- prometheus.M
 				return
 			}
 
-			// Parse storage data with all fields needed for both metrics
 			var result struct {
 				Data []struct {
 					Storage      string  `json:"storage"`
 					Type         string  `json:"type"`
-					Content      string  `json:"content"` // For backup detection
 					Total        float64 `json:"total"`
 					Used         float64 `json:"used"`
 					Avail        float64 `json:"avail"`
@@ -1431,12 +1409,7 @@ func (c *ProxmoxCollector) collectStorageAndBackupMetrics(ch chan<- prometheus.M
 				return
 			}
 
-			// Local backup map for this node (to minimize lock contention)
-			localBackups := make(map[string]int64)
-
-			// Emit storage metrics AND collect backup data in the same loop
 			for _, storage := range result.Data {
-				// PART 1: Storage metrics
 				labels := []string{nodeName, storage.Storage, storage.Type}
 				ch <- prometheus.MustNewConstMetric(c.storageTotal, prometheus.GaugeValue, storage.Total, labels...)
 				ch <- prometheus.MustNewConstMetric(c.storageUsed, prometheus.GaugeValue, storage.Used, labels...)
@@ -1445,115 +1418,8 @@ func (c *ProxmoxCollector) collectStorageAndBackupMetrics(ch chan<- prometheus.M
 				ch <- prometheus.MustNewConstMetric(c.storageEnabled, prometheus.GaugeValue, float64(storage.Enabled), labels...)
 				ch <- prometheus.MustNewConstMetric(c.storageShared, prometheus.GaugeValue, float64(storage.Shared), labels...)
 				ch <- prometheus.MustNewConstMetric(c.storageUsedFraction, prometheus.GaugeValue, storage.UsedFraction, labels...)
-
-				// PART 2: Backup content discovery (only for storages with backup content)
-				// Also check for PBS type as they always support backups
-				hasBackupContent := strings.Contains(storage.Content, "backup") || storage.Type == "pbs"
-				if !hasBackupContent {
-					continue
-				}
-
-				contentPath := fmt.Sprintf("/nodes/%s/storage/%s/content?content=backup", nodeName, storage.Storage)
-				contentData, err := c.apiRequest(contentPath)
-				if err != nil {
-					log.Printf("Debug: Error fetching backup content from %s on node %s: %v", storage.Storage, nodeName, err)
-					continue
-				}
-
-				var contentResult struct {
-					Data []struct {
-						VolID  string      `json:"volid"`
-						VMID   interface{} `json:"vmid"` // Can be string, int, or nil
-						CTime  int64       `json:"ctime"`
-						Format string      `json:"format"` // e.g. "pbs-vm", "vma.zst"
-					} `json:"data"`
-				}
-
-				if err := json.Unmarshal(contentData, &contentResult); err != nil {
-					log.Printf("Error unmarshaling backup content for storage %s on node %s: %v", storage.Storage, nodeName, err)
-					continue
-				}
-
-				for _, item := range contentResult.Data {
-					// Parse VMID - try field first, then extract from volid
-					var vmid string
-					switch v := item.VMID.(type) {
-					case float64:
-						vmid = fmt.Sprintf("%.0f", v)
-					case string:
-						vmid = v
-					default:
-						// Try to extract from volid
-						vmid = extractVMIDFromVolID(item.VolID)
-						if vmid == "" {
-							continue
-						}
-					}
-
-					if item.CTime > localBackups[vmid] {
-						localBackups[vmid] = item.CTime
-					}
-				}
 			}
-
-			// Merge local backups into global map (with lock)
-			backupMutex.Lock()
-			for vmid, timestamp := range localBackups {
-				if timestamp > globalLastBackups[vmid] {
-					globalLastBackups[vmid] = timestamp
-				}
-			}
-			backupMutex.Unlock()
-
-			// Emit backup metrics for this node
-			backupMutex.Lock()
-			for vmid, timestamp := range globalLastBackups {
-				ch <- prometheus.MustNewConstMetric(
-					c.guestLastBackup,
-					prometheus.GaugeValue,
-					float64(timestamp),
-					nodeName,
-					vmid,
-				)
-			}
-			backupMutex.Unlock()
 		}(node)
 	}
 	wg.Wait()
-}
-
-// extractVMIDFromVolID extracts VMID from backup volume ID
-// Formats:
-// - PBS: "storage:backup/vm/100/2023..." or "storage:backup/ct/100/..."
-// - Standard: "storage:backup/vzdump-qemu-100-2023..." or "storage:backup/vzdump-lxc-100-..."
-func extractVMIDFromVolID(volid string) string {
-	// Try PBS format first: backup/vm/100/ or backup/ct/100/
-	if strings.Contains(volid, "/vm/") || strings.Contains(volid, "/ct/") {
-		parts := strings.Split(volid, "/")
-		for i, p := range parts {
-			if (p == "vm" || p == "ct") && i+1 < len(parts) {
-				// Next part should be VMID
-				vmidPart := parts[i+1]
-				// Handle potential namespace:vmid format
-				if strings.Contains(vmidPart, ":") {
-					vmidPart = strings.Split(vmidPart, ":")[0]
-				}
-				return vmidPart
-			}
-		}
-	}
-
-	// Try standard vzdump format: vzdump-qemu-100-2023 or vzdump-lxc-100-2023
-	if strings.Contains(volid, "vzdump-") {
-		// Extract the part after "vzdump-qemu-" or "vzdump-lxc-"
-		parts := strings.Split(volid, "-")
-		for i, p := range parts {
-			if (p == "qemu" || p == "lxc") && i+1 < len(parts) {
-				// Next part should be VMID
-				return parts[i+1]
-			}
-		}
-	}
-
-	return ""
 }
