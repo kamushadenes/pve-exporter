@@ -57,9 +57,15 @@ sudo cat > /etc/pve-exporter/config.yml << 'EOF'
 proxmox:
   host: "proxmox.example.com"
   port: 8006
-  # Recommended: Use API Token instead of password
-  token_id: "monitoring@pve!exporter"
-  token_secret: "your-token-secret"
+  
+  # Option A: Password authentication
+  user: "monitoring@pve"
+  password: "your-password"
+  
+  # Option B: API Token authentication (recommended, comment out user/password above)
+  # token_id: "monitoring@pve!exporter"
+  # token_secret: "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+  
   insecure_skip_verify: true
 
 server:
@@ -71,6 +77,8 @@ EOF
 sudo chown root:pve-exporter /etc/pve-exporter/config.yml
 sudo chmod 640 /etc/pve-exporter/config.yml
 ```
+
+> **Note:** The `token_id` format is `user@realm!tokenname` - the exclamation mark is Proxmox syntax, not an error.
 
 ### 4. Create systemd service
 
@@ -123,37 +131,54 @@ sudo journalctl -u pve-exporter -f
 
 ## ⚙️ Configuration
 
-You can configure the exporter using a `config.yml` file or environment variables.
+### Configuration File Options
+
+| Option | Description | Default |
+|--------|-------------|---------|
+| `proxmox.host` | Proxmox host address | `localhost` |
+| `proxmox.port` | Proxmox API port | `8006` |
+| `proxmox.user` | Proxmox user (for password auth) | `root@pam` |
+| `proxmox.password` | Proxmox password | - |
+| `proxmox.token_id` | API token ID (alternative to password) | - |
+| `proxmox.token_secret` | API token secret | - |
+| `proxmox.insecure_skip_verify` | Skip TLS verification | `true` |
+| `server.listen_address` | HTTP server listen address | `:9221` |
+| `server.metrics_path` | Metrics endpoint path | `/metrics` |
 
 ### Environment Variables
 
-| Variable | Description | Default |
-|----------|-------------|---------|
-| `PVE_HOST` | Proxmox host address | `localhost` |
-| `PVE_USER` | Proxmox user | `root@pam` |
-| `PVE_PASSWORD` | Proxmox password | - |
-| `PVE_TOKEN_ID` | API token ID (alternative to password) | - |
-| `PVE_TOKEN_SECRET` | API token secret | - |
-| `PVE_INSECURE_SKIP_VERIFY` | Skip TLS verification | `true` |
-| `LISTEN_ADDRESS` | HTTP server listen address | `:9221` |
-| `METRICS_PATH` | Metrics endpoint path | `/metrics` |
+As an alternative to a config file, you can use environment variables:
 
-### Configuration File (`config.yml`)
+| Variable | Config equivalent |
+|----------|------------------|
+| `PVE_HOST` | `proxmox.host` |
+| `PVE_USER` | `proxmox.user` |
+| `PVE_PASSWORD` | `proxmox.password` |
+| `PVE_TOKEN_ID` | `proxmox.token_id` |
+| `PVE_TOKEN_SECRET` | `proxmox.token_secret` |
+| `PVE_INSECURE_SKIP_VERIFY` | `proxmox.insecure_skip_verify` |
+| `LISTEN_ADDRESS` | `server.listen_address` |
+| `METRICS_PATH` | `server.metrics_path` |
 
-```yaml
-proxmox:
-  host: "proxmox.example.com"
-  port: 8006
-  user: "root@pam"
-  # Recommended: Use API Token instead of password
-  token_id: "monitoring@pve!exporter"
-  token_secret: "your-token-secret"
-  insecure_skip_verify: true
+## 📈 Grafana Dashboard
 
-server:
-  listen_address: ":9221"
-  metrics_path: "/metrics"
-```
+Import the official dashboard from Grafana.com:
+
+<!-- TODO: Once dashboard is published, update with actual Dashboard ID
+[![Grafana Dashboard](https://img.shields.io/badge/Grafana-Dashboard-orange)](https://grafana.com/grafana/dashboards/XXXXX)
+**Dashboard ID:** `XXXXX`
+-->
+
+Or import manually from [`grafana/pve-exporter.json`](grafana/pve-exporter.json)
+
+**Features:**
+- Cluster overview with node/VM/LXC counts
+- Per-node CPU, Memory, Load, and Filesystem metrics
+- VM and LXC tables with status, CPU, memory, uptime
+- Network and Disk I/O graphs
+- Storage usage visualization
+- ZFS pool health, fragmentation, and ARC statistics
+- Backup monitoring with age alerts
 
 ## 📊 Metrics
 
@@ -286,7 +311,7 @@ The exporter exposes the following metrics at `/metrics`.
 | `pve_zfs_arc_max_size_bytes` | ARC max size |
 | `pve_zfs_arc_hits_total` | ARC hits |
 | `pve_zfs_arc_misses_total` | ARC misses |
-| `pve_zfs_arc_hit_ratio` | ARC hit ratio |
+| `pve_zfs_arc_hit_ratio_percent` | ARC hit ratio in percent (0-100) |
 | `pve_zfs_arc_target_size_bytes` | ARC target size (c) |
 | `pve_zfs_arc_l2_hits_total` | L2ARC hits |
 | `pve_zfs_arc_l2_misses_total` | L2ARC misses |

@@ -99,6 +99,9 @@ func (c *ProxmoxCollector) collectZFSARCMetrics(ch chan<- prometheus.Metric) {
 		hostname = "localhost"
 	}
 
+	// Collect all values first to calculate hit ratio
+	var hits, misses float64
+
 	scanner := bufio.NewScanner(file)
 	// Skip header lines (usually first 2)
 	// name    type    data
@@ -125,8 +128,10 @@ func (c *ProxmoxCollector) collectZFSARCMetrics(ch chan<- prometheus.Metric) {
 		case "c_max":
 			ch <- prometheus.MustNewConstMetric(c.zfsARCMaxSize, prometheus.GaugeValue, value, hostname)
 		case "hits":
+			hits = value
 			ch <- prometheus.MustNewConstMetric(c.zfsARCHits, prometheus.CounterValue, value, hostname)
 		case "misses":
+			misses = value
 			ch <- prometheus.MustNewConstMetric(c.zfsARCMisses, prometheus.CounterValue, value, hostname)
 		case "c":
 			ch <- prometheus.MustNewConstMetric(c.zfsARCTargetSize, prometheus.GaugeValue, value, hostname)
@@ -141,12 +146,11 @@ func (c *ProxmoxCollector) collectZFSARCMetrics(ch chan<- prometheus.Metric) {
 		}
 	}
 
-	// Calculate hit ratio if possible (requires state, but we are stateless here).
-	// Prometheus usually calculates rates on server side.
-	// However, we can provide a point-in-time ratio if we want, but it's better to let Prometheus do `rate(hits) / (rate(hits) + rate(misses))`
-	// We defined zfsARCHitRatio, let's see if we can populate it.
-	// Without keeping state of previous scrape, we can only provide the ratio of TOTAL hits/misses since boot, which is not very useful.
-	// So we might skip zfsARCHitRatio and let users calculate it.
-	// OR, we can just export the raw counters (which we did).
-	// I'll leave zfsARCHitRatio unpopulated for now as it's better calculated via PromQL.
+	// Calculate and emit hit ratio percent (hits / (hits + misses) * 100)
+	// This is the cumulative hit ratio since boot, useful for overall ARC efficiency
+	total := hits + misses
+	if total > 0 {
+		hitRatioPercent := (hits / total) * 100
+		ch <- prometheus.MustNewConstMetric(c.zfsARCHitRatio, prometheus.GaugeValue, hitRatioPercent, hostname)
+	}
 }

@@ -692,8 +692,8 @@ func NewProxmoxCollector(cfg *config.ProxmoxConfig) *ProxmoxCollector {
 			[]string{"node"}, nil,
 		),
 		zfsARCHitRatio: prometheus.NewDesc(
-			"pve_zfs_arc_hit_ratio",
-			"ZFS ARC hit ratio",
+			"pve_zfs_arc_hit_ratio_percent",
+			"ZFS ARC hit ratio in percent (0-100)",
 			[]string{"node"}, nil,
 		),
 		zfsARCTargetSize: prometheus.NewDesc(
