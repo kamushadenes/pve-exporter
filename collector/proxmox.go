@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"strconv"
 	"sync"
 
 	"github.com/bigtcze/pve-exporter/config"
@@ -25,15 +26,26 @@ type ProxmoxCollector struct {
 	nodeUp          *prometheus.Desc
 	nodeUptime      *prometheus.Desc
 	nodeCPULoad     *prometheus.Desc
-	nodeCPUs        *prometheus.Desc // New
+	nodeCPUs        *prometheus.Desc
 	nodeMemoryTotal *prometheus.Desc
 	nodeMemoryUsed  *prometheus.Desc
 	nodeMemoryFree  *prometheus.Desc
 	nodeSwapTotal   *prometheus.Desc
 	nodeSwapUsed    *prometheus.Desc
 	nodeSwapFree    *prometheus.Desc
-	nodeVMCount     *prometheus.Desc // New
-	nodeLXCCount    *prometheus.Desc // New
+	nodeVMCount     *prometheus.Desc
+	nodeLXCCount    *prometheus.Desc
+	// New node metrics
+	nodeLoad1       *prometheus.Desc
+	nodeLoad5       *prometheus.Desc
+	nodeLoad15      *prometheus.Desc
+	nodeIOWait      *prometheus.Desc
+	nodeRootfsTotal *prometheus.Desc
+	nodeRootfsUsed  *prometheus.Desc
+	nodeRootfsFree  *prometheus.Desc
+	nodeCPUCores    *prometheus.Desc
+	nodeCPUSockets  *prometheus.Desc
+	nodeKSMShared   *prometheus.Desc
 
 	// VM metrics
 	vmStatus    *prometheus.Desc
@@ -61,14 +73,20 @@ type ProxmoxCollector struct {
 	lxcNetOut    *prometheus.Desc
 	lxcDiskRead  *prometheus.Desc
 	lxcDiskWrite *prometheus.Desc
+	// New LXC metrics
+	lxcSwap    *prometheus.Desc
+	lxcMaxSwap *prometheus.Desc
 
 	// Storage metrics
-	storageTotal *prometheus.Desc
-	storageUsed  *prometheus.Desc
-	storageAvail *prometheus.Desc
+	storageTotal   *prometheus.Desc
+	storageUsed    *prometheus.Desc
+	storageAvail   *prometheus.Desc
+	storageActive  *prometheus.Desc
+	storageEnabled *prometheus.Desc
+	storageShared  *prometheus.Desc
 
 	// Backup metrics
-	guestLastBackup *prometheus.Desc // New
+	guestLastBackup *prometheus.Desc
 }
 
 // NewProxmoxCollector creates a new Proxmox collector
@@ -145,6 +163,57 @@ func NewProxmoxCollector(cfg *config.ProxmoxConfig) *ProxmoxCollector {
 		nodeLXCCount: prometheus.NewDesc(
 			"pve_node_lxc_count",
 			"Number of LXC containers",
+			[]string{"node"}, nil,
+		),
+		// New node metrics
+		nodeLoad1: prometheus.NewDesc(
+			"pve_node_load1",
+			"Node load average 1 minute",
+			[]string{"node"}, nil,
+		),
+		nodeLoad5: prometheus.NewDesc(
+			"pve_node_load5",
+			"Node load average 5 minutes",
+			[]string{"node"}, nil,
+		),
+		nodeLoad15: prometheus.NewDesc(
+			"pve_node_load15",
+			"Node load average 15 minutes",
+			[]string{"node"}, nil,
+		),
+		nodeIOWait: prometheus.NewDesc(
+			"pve_node_iowait",
+			"Node I/O wait ratio",
+			[]string{"node"}, nil,
+		),
+		nodeRootfsTotal: prometheus.NewDesc(
+			"pve_node_rootfs_total_bytes",
+			"Node root filesystem total size in bytes",
+			[]string{"node"}, nil,
+		),
+		nodeRootfsUsed: prometheus.NewDesc(
+			"pve_node_rootfs_used_bytes",
+			"Node root filesystem used in bytes",
+			[]string{"node"}, nil,
+		),
+		nodeRootfsFree: prometheus.NewDesc(
+			"pve_node_rootfs_free_bytes",
+			"Node root filesystem free in bytes",
+			[]string{"node"}, nil,
+		),
+		nodeCPUCores: prometheus.NewDesc(
+			"pve_node_cpu_cores",
+			"Number of CPU cores per socket",
+			[]string{"node"}, nil,
+		),
+		nodeCPUSockets: prometheus.NewDesc(
+			"pve_node_cpu_sockets",
+			"Number of CPU sockets",
+			[]string{"node"}, nil,
+		),
+		nodeKSMShared: prometheus.NewDesc(
+			"pve_node_ksm_shared_bytes",
+			"KSM shared memory in bytes",
 			[]string{"node"}, nil,
 		),
 
@@ -266,6 +335,16 @@ func NewProxmoxCollector(cfg *config.ProxmoxConfig) *ProxmoxCollector {
 			"LXC disk write in bytes",
 			[]string{"node", "vmid", "name"}, nil,
 		),
+		lxcSwap: prometheus.NewDesc(
+			"pve_lxc_swap_used_bytes",
+			"LXC swap usage in bytes",
+			[]string{"node", "vmid", "name"}, nil,
+		),
+		lxcMaxSwap: prometheus.NewDesc(
+			"pve_lxc_swap_max_bytes",
+			"LXC maximum swap in bytes",
+			[]string{"node", "vmid", "name"}, nil,
+		),
 
 		// Storage metrics
 		storageTotal: prometheus.NewDesc(
@@ -281,6 +360,21 @@ func NewProxmoxCollector(cfg *config.ProxmoxConfig) *ProxmoxCollector {
 		storageAvail: prometheus.NewDesc(
 			"pve_storage_available_bytes",
 			"Available storage in bytes",
+			[]string{"node", "storage", "type"}, nil,
+		),
+		storageActive: prometheus.NewDesc(
+			"pve_storage_active",
+			"Storage is active (1=active, 0=inactive)",
+			[]string{"node", "storage", "type"}, nil,
+		),
+		storageEnabled: prometheus.NewDesc(
+			"pve_storage_enabled",
+			"Storage is enabled (1=enabled, 0=disabled)",
+			[]string{"node", "storage", "type"}, nil,
+		),
+		storageShared: prometheus.NewDesc(
+			"pve_storage_shared",
+			"Storage is shared (1=shared, 0=local)",
 			[]string{"node", "storage", "type"}, nil,
 		),
 
@@ -307,6 +401,16 @@ func (c *ProxmoxCollector) Describe(ch chan<- *prometheus.Desc) {
 	ch <- c.nodeSwapFree
 	ch <- c.nodeVMCount
 	ch <- c.nodeLXCCount
+	ch <- c.nodeLoad1
+	ch <- c.nodeLoad5
+	ch <- c.nodeLoad15
+	ch <- c.nodeIOWait
+	ch <- c.nodeRootfsTotal
+	ch <- c.nodeRootfsUsed
+	ch <- c.nodeRootfsFree
+	ch <- c.nodeCPUCores
+	ch <- c.nodeCPUSockets
+	ch <- c.nodeKSMShared
 	ch <- c.vmStatus
 	ch <- c.vmUptime
 	ch <- c.vmCPU
@@ -330,9 +434,14 @@ func (c *ProxmoxCollector) Describe(ch chan<- *prometheus.Desc) {
 	ch <- c.lxcNetOut
 	ch <- c.lxcDiskRead
 	ch <- c.lxcDiskWrite
+	ch <- c.lxcSwap
+	ch <- c.lxcMaxSwap
 	ch <- c.storageTotal
 	ch <- c.storageUsed
 	ch <- c.storageAvail
+	ch <- c.storageActive
+	ch <- c.storageEnabled
+	ch <- c.storageShared
 	ch <- c.guestLastBackup
 }
 
@@ -445,7 +554,7 @@ func (c *ProxmoxCollector) collectNodeMetrics(ch chan<- prometheus.Metric) {
 			Status  string  `json:"status"`
 			Uptime  float64 `json:"uptime"`
 			CPU     float64 `json:"cpu"`
-			CPUs    float64 `json:"cpus"` // New field
+			CPUs    float64 `json:"cpus"`
 			MaxCPU  float64 `json:"maxcpu"`
 			Mem     float64 `json:"mem"`
 			MaxMem  float64 `json:"maxmem"`
@@ -471,11 +580,80 @@ func (c *ProxmoxCollector) collectNodeMetrics(ch chan<- prometheus.Metric) {
 		ch <- prometheus.MustNewConstMetric(c.nodeMemoryTotal, prometheus.GaugeValue, node.MaxMem, node.Node)
 		ch <- prometheus.MustNewConstMetric(c.nodeMemoryUsed, prometheus.GaugeValue, node.Mem, node.Node)
 		ch <- prometheus.MustNewConstMetric(c.nodeMemoryFree, prometheus.GaugeValue, node.MaxMem-node.Mem, node.Node)
-		// Swap metrics are not available in /nodes endpoint
-		ch <- prometheus.MustNewConstMetric(c.nodeSwapTotal, prometheus.GaugeValue, 0, node.Node)
-		ch <- prometheus.MustNewConstMetric(c.nodeSwapUsed, prometheus.GaugeValue, 0, node.Node)
-		ch <- prometheus.MustNewConstMetric(c.nodeSwapFree, prometheus.GaugeValue, 0, node.Node)
+
+		// Fetch detailed node status for additional metrics
+		c.collectNodeDetailedMetrics(ch, node.Node)
 	}
+}
+
+// collectNodeDetailedMetrics fetches detailed node status from /nodes/{node}/status
+func (c *ProxmoxCollector) collectNodeDetailedMetrics(ch chan<- prometheus.Metric, nodeName string) {
+	path := fmt.Sprintf("/nodes/%s/status", nodeName)
+	data, err := c.apiRequest(path)
+	if err != nil {
+		return
+	}
+
+	var result struct {
+		Data struct {
+			LoadAvg []string `json:"loadavg"`
+			Wait    float64  `json:"wait"`
+			KSM     struct {
+				Shared float64 `json:"shared"`
+			} `json:"ksm"`
+			CPUInfo struct {
+				Cores   float64 `json:"cores"`
+				Sockets float64 `json:"sockets"`
+			} `json:"cpuinfo"`
+			Rootfs struct {
+				Total float64 `json:"total"`
+				Used  float64 `json:"used"`
+				Free  float64 `json:"free"`
+			} `json:"rootfs"`
+			Swap struct {
+				Total float64 `json:"total"`
+				Used  float64 `json:"used"`
+				Free  float64 `json:"free"`
+			} `json:"swap"`
+		} `json:"data"`
+	}
+
+	if err := json.Unmarshal(data, &result); err != nil {
+		return
+	}
+
+	// Load averages
+	if len(result.Data.LoadAvg) >= 3 {
+		if load1, err := strconv.ParseFloat(result.Data.LoadAvg[0], 64); err == nil {
+			ch <- prometheus.MustNewConstMetric(c.nodeLoad1, prometheus.GaugeValue, load1, nodeName)
+		}
+		if load5, err := strconv.ParseFloat(result.Data.LoadAvg[1], 64); err == nil {
+			ch <- prometheus.MustNewConstMetric(c.nodeLoad5, prometheus.GaugeValue, load5, nodeName)
+		}
+		if load15, err := strconv.ParseFloat(result.Data.LoadAvg[2], 64); err == nil {
+			ch <- prometheus.MustNewConstMetric(c.nodeLoad15, prometheus.GaugeValue, load15, nodeName)
+		}
+	}
+
+	// I/O wait
+	ch <- prometheus.MustNewConstMetric(c.nodeIOWait, prometheus.GaugeValue, result.Data.Wait, nodeName)
+
+	// Root filesystem
+	ch <- prometheus.MustNewConstMetric(c.nodeRootfsTotal, prometheus.GaugeValue, result.Data.Rootfs.Total, nodeName)
+	ch <- prometheus.MustNewConstMetric(c.nodeRootfsUsed, prometheus.GaugeValue, result.Data.Rootfs.Used, nodeName)
+	ch <- prometheus.MustNewConstMetric(c.nodeRootfsFree, prometheus.GaugeValue, result.Data.Rootfs.Free, nodeName)
+
+	// CPU topology
+	ch <- prometheus.MustNewConstMetric(c.nodeCPUCores, prometheus.GaugeValue, result.Data.CPUInfo.Cores, nodeName)
+	ch <- prometheus.MustNewConstMetric(c.nodeCPUSockets, prometheus.GaugeValue, result.Data.CPUInfo.Sockets, nodeName)
+
+	// KSM shared memory
+	ch <- prometheus.MustNewConstMetric(c.nodeKSMShared, prometheus.GaugeValue, result.Data.KSM.Shared, nodeName)
+
+	// Swap (from detailed status)
+	ch <- prometheus.MustNewConstMetric(c.nodeSwapTotal, prometheus.GaugeValue, result.Data.Swap.Total, nodeName)
+	ch <- prometheus.MustNewConstMetric(c.nodeSwapUsed, prometheus.GaugeValue, result.Data.Swap.Used, nodeName)
+	ch <- prometheus.MustNewConstMetric(c.nodeSwapFree, prometheus.GaugeValue, result.Data.Swap.Free, nodeName)
 }
 
 // collectVMMetrics collects VM and container metrics
@@ -579,6 +757,8 @@ func (c *ProxmoxCollector) collectResourceMetrics(ch chan<- prometheus.Metric, n
 			ch <- prometheus.MustNewConstMetric(c.lxcNetOut, prometheus.CounterValue, vm.NetOut, labels...)
 			ch <- prometheus.MustNewConstMetric(c.lxcDiskRead, prometheus.CounterValue, diskRead, labels...)
 			ch <- prometheus.MustNewConstMetric(c.lxcDiskWrite, prometheus.CounterValue, diskWrite, labels...)
+			// Get LXC swap from detailed status
+			c.collectLXCSwapMetrics(ch, node, vm.VMID, labels)
 		} else {
 			ch <- prometheus.MustNewConstMetric(c.vmStatus, prometheus.GaugeValue, status, labels...)
 			ch <- prometheus.MustNewConstMetric(c.vmUptime, prometheus.GaugeValue, vm.Uptime, labels...)
@@ -595,6 +775,29 @@ func (c *ProxmoxCollector) collectResourceMetrics(ch chan<- prometheus.Metric, n
 	}
 
 	return len(result.Data)
+}
+
+// collectLXCSwapMetrics fetches swap metrics for LXC containers
+func (c *ProxmoxCollector) collectLXCSwapMetrics(ch chan<- prometheus.Metric, node string, vmid int64, labels []string) {
+	path := fmt.Sprintf("/nodes/%s/lxc/%d/status/current", node, vmid)
+	data, err := c.apiRequest(path)
+	if err != nil {
+		return
+	}
+
+	var result struct {
+		Data struct {
+			Swap    float64 `json:"swap"`
+			MaxSwap float64 `json:"maxswap"`
+		} `json:"data"`
+	}
+
+	if err := json.Unmarshal(data, &result); err != nil {
+		return
+	}
+
+	ch <- prometheus.MustNewConstMetric(c.lxcSwap, prometheus.GaugeValue, result.Data.Swap, labels...)
+	ch <- prometheus.MustNewConstMetric(c.lxcMaxSwap, prometheus.GaugeValue, result.Data.MaxSwap, labels...)
 }
 
 // collectStorageMetrics collects storage metrics
@@ -629,6 +832,9 @@ func (c *ProxmoxCollector) collectStorageMetrics(ch chan<- prometheus.Metric) {
 				Total   float64 `json:"total"`
 				Used    float64 `json:"used"`
 				Avail   float64 `json:"avail"`
+				Active  int     `json:"active"`
+				Enabled int     `json:"enabled"`
+				Shared  int     `json:"shared"`
 			} `json:"data"`
 		}
 
@@ -641,6 +847,9 @@ func (c *ProxmoxCollector) collectStorageMetrics(ch chan<- prometheus.Metric) {
 			ch <- prometheus.MustNewConstMetric(c.storageTotal, prometheus.GaugeValue, storage.Total, labels...)
 			ch <- prometheus.MustNewConstMetric(c.storageUsed, prometheus.GaugeValue, storage.Used, labels...)
 			ch <- prometheus.MustNewConstMetric(c.storageAvail, prometheus.GaugeValue, storage.Avail, labels...)
+			ch <- prometheus.MustNewConstMetric(c.storageActive, prometheus.GaugeValue, float64(storage.Active), labels...)
+			ch <- prometheus.MustNewConstMetric(c.storageEnabled, prometheus.GaugeValue, float64(storage.Enabled), labels...)
+			ch <- prometheus.MustNewConstMetric(c.storageShared, prometheus.GaugeValue, float64(storage.Shared), labels...)
 		}
 	}
 }

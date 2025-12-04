@@ -169,8 +169,21 @@ The exporter exposes the following metrics at `/metrics`.
 | `pve_node_memory_total_bytes` | Total memory in bytes |
 | `pve_node_memory_used_bytes` | Used memory in bytes |
 | `pve_node_memory_free_bytes` | Free memory in bytes |
+| `pve_node_swap_total_bytes` | Total swap in bytes |
+| `pve_node_swap_used_bytes` | Used swap in bytes |
+| `pve_node_swap_free_bytes` | Free swap in bytes |
 | `pve_node_vm_count` | Number of QEMU VMs |
 | `pve_node_lxc_count` | Number of LXC containers |
+| `pve_node_load1` | Load average 1 minute |
+| `pve_node_load5` | Load average 5 minutes |
+| `pve_node_load15` | Load average 15 minutes |
+| `pve_node_iowait` | I/O wait ratio |
+| `pve_node_rootfs_total_bytes` | Root filesystem total size |
+| `pve_node_rootfs_used_bytes` | Root filesystem used |
+| `pve_node_rootfs_free_bytes` | Root filesystem free |
+| `pve_node_cpu_cores` | CPU cores per socket |
+| `pve_node_cpu_sockets` | Number of CPU sockets |
+| `pve_node_ksm_shared_bytes` | KSM shared memory |
 
 ### VM Metrics (QEMU)
 
@@ -201,6 +214,8 @@ The exporter exposes the following metrics at `/metrics`.
 | `pve_lxc_memory_max_bytes` | Total memory in bytes |
 | `pve_lxc_disk_used_bytes` | Used disk space in bytes |
 | `pve_lxc_disk_max_bytes` | Total disk space in bytes |
+| `pve_lxc_swap_used_bytes` | Used swap in bytes |
+| `pve_lxc_swap_max_bytes` | Maximum swap in bytes |
 | `pve_lxc_network_in_bytes_total` | Network input bytes |
 | `pve_lxc_network_out_bytes_total` | Network output bytes |
 | `pve_lxc_disk_read_bytes_total` | Disk read bytes |
@@ -214,6 +229,9 @@ The exporter exposes the following metrics at `/metrics`.
 | `pve_storage_total_bytes` | Total storage size in bytes |
 | `pve_storage_used_bytes` | Used storage in bytes |
 | `pve_storage_available_bytes` | Available storage in bytes |
+| `pve_storage_active` | Storage is active (1=yes) |
+| `pve_storage_enabled` | Storage is enabled (1=yes) |
+| `pve_storage_shared` | Storage is shared (1=yes) |
 
 ## 🔒 Authentication & Permissions
 
