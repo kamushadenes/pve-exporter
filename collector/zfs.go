@@ -8,6 +8,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"sync"
 
 	"github.com/prometheus/client_golang/prometheus"
 )
@@ -20,43 +21,51 @@ func (c *ProxmoxCollector) collectZFSMetricsWithNodes(ch chan<- prometheus.Metri
 
 // collectZFSPoolMetricsWithNodes collects ZFS pool metrics using pre-fetched nodes list
 func (c *ProxmoxCollector) collectZFSPoolMetricsWithNodes(ch chan<- prometheus.Metric, nodes []string) {
+	// Process nodes in parallel for better performance
+	var wg sync.WaitGroup
 	for _, node := range nodes {
-		path := fmt.Sprintf("/nodes/%s/disks/zfs", node)
-		data, err := c.apiRequest(path)
-		if err != nil {
-			// ZFS might not be installed or configured on this node
-			continue
-		}
+		wg.Add(1)
+		go func(nodeName string) {
+			defer wg.Done()
 
-		var result struct {
-			Data []struct {
-				Name   string  `json:"name"`
-				Health string  `json:"health"`
-				Size   float64 `json:"size"`
-				Alloc  float64 `json:"alloc"`
-				Free   float64 `json:"free"`
-				Frag   float64 `json:"frag"`
-			} `json:"data"`
-		}
-
-		if err := json.Unmarshal(data, &result); err != nil {
-			log.Printf("Error unmarshaling ZFS pools for node %s: %v", node, err)
-			continue
-		}
-
-		for _, pool := range result.Data {
-			health := 0.0
-			if pool.Health == "ONLINE" {
-				health = 1.0
+			path := fmt.Sprintf("/nodes/%s/disks/zfs", nodeName)
+			data, err := c.apiRequest(path)
+			if err != nil {
+				// ZFS might not be installed or configured on this node
+				return
 			}
 
-			ch <- prometheus.MustNewConstMetric(c.zfsPoolHealth, prometheus.GaugeValue, health, node, pool.Name)
-			ch <- prometheus.MustNewConstMetric(c.zfsPoolSize, prometheus.GaugeValue, pool.Size, node, pool.Name)
-			ch <- prometheus.MustNewConstMetric(c.zfsPoolAlloc, prometheus.GaugeValue, pool.Alloc, node, pool.Name)
-			ch <- prometheus.MustNewConstMetric(c.zfsPoolFree, prometheus.GaugeValue, pool.Free, node, pool.Name)
-			ch <- prometheus.MustNewConstMetric(c.zfsPoolFrag, prometheus.GaugeValue, pool.Frag, node, pool.Name)
-		}
+			var result struct {
+				Data []struct {
+					Name   string  `json:"name"`
+					Health string  `json:"health"`
+					Size   float64 `json:"size"`
+					Alloc  float64 `json:"alloc"`
+					Free   float64 `json:"free"`
+					Frag   float64 `json:"frag"`
+				} `json:"data"`
+			}
+
+			if err := json.Unmarshal(data, &result); err != nil {
+				log.Printf("Error unmarshaling ZFS pools for node %s: %v", nodeName, err)
+				return
+			}
+
+			for _, pool := range result.Data {
+				health := 0.0
+				if pool.Health == "ONLINE" {
+					health = 1.0
+				}
+
+				ch <- prometheus.MustNewConstMetric(c.zfsPoolHealth, prometheus.GaugeValue, health, nodeName, pool.Name)
+				ch <- prometheus.MustNewConstMetric(c.zfsPoolSize, prometheus.GaugeValue, pool.Size, nodeName, pool.Name)
+				ch <- prometheus.MustNewConstMetric(c.zfsPoolAlloc, prometheus.GaugeValue, pool.Alloc, nodeName, pool.Name)
+				ch <- prometheus.MustNewConstMetric(c.zfsPoolFree, prometheus.GaugeValue, pool.Free, nodeName, pool.Name)
+				ch <- prometheus.MustNewConstMetric(c.zfsPoolFrag, prometheus.GaugeValue, pool.Frag, nodeName, pool.Name)
+			}
+		}(node)
 	}
+	wg.Wait()
 }
 
 // collectZFSARCMetrics collects ZFS ARC metrics from /proc/spl/kstat/zfs/arcstats
