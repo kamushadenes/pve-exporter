@@ -25,6 +25,7 @@ func main() {
 	// CLI flags
 	showVersion := flag.Bool("version", false, "Print version and exit")
 	selfUpdate := flag.Bool("selfupdate", false, "Update to latest version and restart")
+	configFile := flag.String("config", "", "Path to configuration file")
 	flag.Parse()
 
 	// Handle --version
@@ -44,7 +45,7 @@ func main() {
 	log.Printf("Starting pve-exporter version=%s commit=%s date=%s", version, commit, date)
 
 	// Load configuration
-	cfg, err := config.Load()
+	cfg, err := config.LoadFromFile(*configFile)
 	if err != nil {
 		log.Fatalf("Failed to load configuration: %v", err)
 	}

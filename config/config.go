@@ -1,7 +1,6 @@
 package config
 
 import (
-	"flag"
 	"fmt"
 	"os"
 	"time"
@@ -34,11 +33,8 @@ type ServerConfig struct {
 	MetricsPath   string `yaml:"metrics_path"`
 }
 
-// Load loads configuration from file and environment variables
-func Load() (*Config, error) {
-	var configFile string
-	flag.StringVar(&configFile, "config", "", "Path to configuration file")
-	flag.Parse()
+// LoadFromFile loads configuration from file and environment variables
+func LoadFromFile(configFile string) (*Config, error) {
 
 	// Default configuration
 	cfg := &Config{
