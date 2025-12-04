@@ -7,17 +7,26 @@ description: How to release a new version of pve-exporter
 To ensure release notes are correctly populated in GitHub Releases, follow this procedure:
 
 1.  **Prepare Changes**: Ensure all code changes are committed.
-2.  **Tag Release**: Create an **annotated tag** with the changelog in the message body.
+
+2.  **Deploy & Verify on Test Server**
+    - Build linux binary: `$env:GOOS='linux'; $env:GOARCH='amd64'; go build -o pve-exporter-linux-amd64 .`
+    - Copy to test server: `pscp -batch pve-exporter-linux-amd64 root@<TEST_SERVER_IP>:/root/`
+      *(See `~/.gemini/pve-exporter-secrets.md` for actual IP)*
+    - Run and verify metrics (especially new ones): `./pve-exporter-linux-amd64 -config config.yml`
+
+3.  **Tag Release**: Create an **annotated tag** with the changelog in the message body.
     *   The **Subject** (first line) will be the Release Title.
-    *   The **Body** (subsequent lines) will be the Release Description/Changelog.
+    *   The **Body** (subsequent lines) must be a **Technical Summary** of changes to the binary/codebase.
+    *   **Do NOT** include: CI/CD changes (chore), Documentation updates (docs), or refactoring without functional impact.
+    *   **Focus on**: New metrics, bug fixes, performance improvements, and breaking changes.
 
     ```bash
-    git tag -a v1.X.X -m "v1.X.X: Release Title" -m "## Changelog" -m "- Feature 1" -m "- Fix 1"
+    git tag -a v1.X.X -m "v1.X.X: Release Title" -m "## Technical Changes" -m "- Added per-device metrics for VM disks and NICs" -m "- Implemented missing Proxmox API metrics (pressure, balloon, HA)"
     ```
 
-3.  **Push Tag**: Push the tag to GitHub to trigger the release workflow.
+4.  **Push Tag**: Push the tag to GitHub to trigger the release workflow.
     ```bash
     git push origin v1.X.X
     ```
 
-**Important**: The GitHub Action is configured to extract the release notes directly from the git tag annotation. Do not rely on GitHub's auto-generated notes as they may be incomplete for direct commits.
+**Important**: The GitHub Action extracts the release notes directly from the git tag annotation. Ensure the tag message is clean, user-facing, and formatted as a Markdown list.
