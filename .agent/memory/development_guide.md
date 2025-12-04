@@ -161,6 +161,17 @@ curl -k -d "username=root@pam&password=yourpassword" \
   https://proxmox.example.com:8006/api2/json/access/ticket
 ```
 
+## Remote Testing (SSH Port Forward)
+
+For testing against a real Proxmox server, use SSH port forwarding:
+
+1. **Setup**: See `testing.local.md` (gitignored, contains server details)
+2. **Port forward**: Forward local 9221 and 8006 to remote server
+3. **Build & deploy**: Cross-compile for Linux, scp to server
+4. **Test locally**: `curl http://localhost:9221/metrics`
+
+> ⚠️ Server credentials and IPs are stored in `testing.local.md` which is excluded from git.
+
 ### Check ZFS Stats Availability
 
 ```bash

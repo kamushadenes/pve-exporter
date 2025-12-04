@@ -1,10 +1,12 @@
 # Binaries
 pve-exporter
 pve-exporter.exe
+*.exe~
 
-# Config
+# Config (may contain credentials)
 config.yml
 config.test.yml
+config.local.yml
 
 # Metrics output (sensitive)
 metrics_*.txt
@@ -13,3 +15,8 @@ metrics.txt
 # IDE
 .vscode/
 .idea/
+
+# Local testing (sensitive - DO NOT COMMIT)
+.local/
+testing.local.md
+
