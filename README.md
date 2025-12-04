@@ -35,16 +35,16 @@ chmod +x pve-exporter-linux-amd64
 
 | Command | Description |
 |---------|-------------|
-| `--version` | Print version and exit |
-| `--selfupdate` | Update to latest version from GitHub and restart service |
+| `-version` | Print version and exit |
+| `-selfupdate` | Update to latest version from GitHub and restart service |
 
 **Self-update:**
 ```bash
 # Update to latest version (run as root)
-sudo pve-exporter --selfupdate
+sudo pve-exporter -selfupdate
 ```
 
-> **Note:** `--selfupdate` requires root privileges because it:
+> **Note:** `-selfupdate` requires root privileges because it:
 > - Replaces the binary in `/usr/local/bin/`
 > - Runs `systemctl restart pve-exporter` to apply the update
 
