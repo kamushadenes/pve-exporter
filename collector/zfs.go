@@ -14,7 +14,34 @@ import (
 
 // collectZFSMetrics collects ZFS pool and ARC metrics
 func (c *ProxmoxCollector) collectZFSMetrics(ch chan<- prometheus.Metric) {
-	c.collectZFSPoolMetrics(ch)
+	// Get list of nodes
+	nodesData, err := c.apiRequest("/nodes")
+	if err != nil {
+		log.Printf("Error fetching nodes for ZFS metrics: %v", err)
+		return
+	}
+
+	var nodesResult struct {
+		Data []struct {
+			Node string `json:"node"`
+		} `json:"data"`
+	}
+
+	if err := json.Unmarshal(nodesData, &nodesResult); err != nil {
+		log.Printf("Error unmarshaling nodes for ZFS metrics: %v", err)
+		return
+	}
+
+	nodes := make([]string, len(nodesResult.Data))
+	for i, n := range nodesResult.Data {
+		nodes[i] = n.Node
+	}
+	c.collectZFSMetricsWithNodes(ch, nodes)
+}
+
+// collectZFSMetricsWithNodes collects ZFS metrics using pre-fetched nodes list
+func (c *ProxmoxCollector) collectZFSMetricsWithNodes(ch chan<- prometheus.Metric, nodes []string) {
+	c.collectZFSPoolMetricsWithNodes(ch, nodes)
 	c.collectZFSARCMetrics(ch)
 }
 
@@ -38,8 +65,17 @@ func (c *ProxmoxCollector) collectZFSPoolMetrics(ch chan<- prometheus.Metric) {
 		return
 	}
 
-	for _, node := range nodesResult.Data {
-		path := fmt.Sprintf("/nodes/%s/disks/zfs", node.Node)
+	nodes := make([]string, len(nodesResult.Data))
+	for i, n := range nodesResult.Data {
+		nodes[i] = n.Node
+	}
+	c.collectZFSPoolMetricsWithNodes(ch, nodes)
+}
+
+// collectZFSPoolMetricsWithNodes collects ZFS pool metrics using pre-fetched nodes list
+func (c *ProxmoxCollector) collectZFSPoolMetricsWithNodes(ch chan<- prometheus.Metric, nodes []string) {
+	for _, node := range nodes {
+		path := fmt.Sprintf("/nodes/%s/disks/zfs", node)
 		data, err := c.apiRequest(path)
 		if err != nil {
 			// ZFS might not be installed or configured on this node
@@ -58,7 +94,7 @@ func (c *ProxmoxCollector) collectZFSPoolMetrics(ch chan<- prometheus.Metric) {
 		}
 
 		if err := json.Unmarshal(data, &result); err != nil {
-			log.Printf("Error unmarshaling ZFS pools for node %s: %v", node.Node, err)
+			log.Printf("Error unmarshaling ZFS pools for node %s: %v", node, err)
 			continue
 		}
 
@@ -68,11 +104,11 @@ func (c *ProxmoxCollector) collectZFSPoolMetrics(ch chan<- prometheus.Metric) {
 				health = 1.0
 			}
 
-			ch <- prometheus.MustNewConstMetric(c.zfsPoolHealth, prometheus.GaugeValue, health, node.Node, pool.Name)
-			ch <- prometheus.MustNewConstMetric(c.zfsPoolSize, prometheus.GaugeValue, pool.Size, node.Node, pool.Name)
-			ch <- prometheus.MustNewConstMetric(c.zfsPoolAlloc, prometheus.GaugeValue, pool.Alloc, node.Node, pool.Name)
-			ch <- prometheus.MustNewConstMetric(c.zfsPoolFree, prometheus.GaugeValue, pool.Free, node.Node, pool.Name)
-			ch <- prometheus.MustNewConstMetric(c.zfsPoolFrag, prometheus.GaugeValue, pool.Frag, node.Node, pool.Name)
+			ch <- prometheus.MustNewConstMetric(c.zfsPoolHealth, prometheus.GaugeValue, health, node, pool.Name)
+			ch <- prometheus.MustNewConstMetric(c.zfsPoolSize, prometheus.GaugeValue, pool.Size, node, pool.Name)
+			ch <- prometheus.MustNewConstMetric(c.zfsPoolAlloc, prometheus.GaugeValue, pool.Alloc, node, pool.Name)
+			ch <- prometheus.MustNewConstMetric(c.zfsPoolFree, prometheus.GaugeValue, pool.Free, node, pool.Name)
+			ch <- prometheus.MustNewConstMetric(c.zfsPoolFrag, prometheus.GaugeValue, pool.Frag, node, pool.Name)
 		}
 	}
 }
