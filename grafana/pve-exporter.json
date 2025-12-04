@@ -2294,12 +2294,12 @@
                     },
                     "targets": [
                         {
-                            "expr": "pve_zfs_arc_hit_ratio{node=~\"$node\"}",
+                            "expr": "pve_zfs_arc_hit_ratio_percent{node=~\"$node\"}",
                             "legendFormat": "{{node}}",
                             "refId": "A"
                         }
                     ],
-                    "title": "ZFS ARC Hit Ratio",
+                    "title": "ZFS ARC Hit Ratio %",
                     "type": "gauge"
                 },
                 {
@@ -2599,13 +2599,13 @@
                     },
                     "targets": [
                         {
-                            "expr": "pve_guest_last_backup_timestamp_seconds * 1000",
+                            "expr": "pve_guest_last_backup_timestamp_seconds{node=~\"$node\"} * 1000",
                             "format": "table",
                             "instant": true,
                             "refId": "A"
                         },
                         {
-                            "expr": "time() - pve_guest_last_backup_timestamp_seconds",
+                            "expr": "time() - pve_guest_last_backup_timestamp_seconds{node=~\"$node\"}",
                             "format": "table",
                             "instant": true,
                             "refId": "B"
