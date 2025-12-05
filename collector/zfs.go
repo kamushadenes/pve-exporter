@@ -68,35 +68,44 @@ func (c *ProxmoxCollector) collectZFSPoolMetricsWithNodes(ch chan<- prometheus.M
 	wg.Wait()
 }
 
+// arcMetricHandler defines how to handle a specific ARC metric
+type arcMetricHandler struct {
+	metric      *prometheus.Desc
+	valueType   prometheus.ValueType
+	trackHits   bool // if true, also store value in hits variable
+	trackMisses bool // if true, also store value in misses variable
+}
+
 // collectZFSARCMetrics collects ZFS ARC metrics from /proc/spl/kstat/zfs/arcstats
 func (c *ProxmoxCollector) collectZFSARCMetrics(ch chan<- prometheus.Metric) {
-	// We assume the exporter runs on the Proxmox host, so we read the file directly.
-	// If running in a container/VM without access, this will fail gracefully.
 	file, err := os.Open("/proc/spl/kstat/zfs/arcstats")
 	if err != nil {
-		// Silent return if file doesn't exist (e.g. not ZFS, or remote)
 		return
 	}
 	defer file.Close()
 
-	// Since we are running on the host, we associate these metrics with the local node name if possible.
-	// However, discovering the local node name from within the collector is tricky without API.
-	// For simplicity, we'll try to use the first node found in config or API, or just "localhost" if all else fails.
-	// Better approach: Since these are host-level metrics, we should ideally label them with the node name.
-	// We can reuse the node discovery logic, but that's expensive.
-	// Let's try to get the hostname from os.Hostname()
 	hostname, _ := os.Hostname()
 	if hostname == "" {
 		hostname = "localhost"
 	}
 
-	// Collect all values first to calculate hit ratio
+	// Map metric names to their handlers
+	handlers := map[string]arcMetricHandler{
+		"size":        {c.zfsARCSize, prometheus.GaugeValue, false, false},
+		"c_min":       {c.zfsARCMinSize, prometheus.GaugeValue, false, false},
+		"c_max":       {c.zfsARCMaxSize, prometheus.GaugeValue, false, false},
+		"hits":        {c.zfsARCHits, prometheus.CounterValue, true, false},
+		"misses":      {c.zfsARCMisses, prometheus.CounterValue, false, true},
+		"c":           {c.zfsARCTargetSize, prometheus.GaugeValue, false, false},
+		"l2_hits":     {c.zfsARCL2Hits, prometheus.CounterValue, false, false},
+		"l2_misses":   {c.zfsARCL2Misses, prometheus.CounterValue, false, false},
+		"l2_size":     {c.zfsARCL2Size, prometheus.GaugeValue, false, false},
+		"l2_hdr_size": {c.zfsARCL2HeaderSize, prometheus.GaugeValue, false, false},
+	}
+
 	var hits, misses float64
 
 	scanner := bufio.NewScanner(file)
-	// Skip header lines (usually first 2)
-	// name    type    data
-	// hits    4    12345
 	for scanner.Scan() {
 		line := scanner.Text()
 		fields := strings.Fields(line)
@@ -105,40 +114,23 @@ func (c *ProxmoxCollector) collectZFSARCMetrics(ch chan<- prometheus.Metric) {
 		}
 
 		name := fields[0]
-		valueStr := fields[2]
-		value, err := strconv.ParseFloat(valueStr, 64)
+		value, err := strconv.ParseFloat(fields[2], 64)
 		if err != nil {
 			continue
 		}
 
-		switch name {
-		case "size":
-			ch <- prometheus.MustNewConstMetric(c.zfsARCSize, prometheus.GaugeValue, value, hostname)
-		case "c_min":
-			ch <- prometheus.MustNewConstMetric(c.zfsARCMinSize, prometheus.GaugeValue, value, hostname)
-		case "c_max":
-			ch <- prometheus.MustNewConstMetric(c.zfsARCMaxSize, prometheus.GaugeValue, value, hostname)
-		case "hits":
-			hits = value
-			ch <- prometheus.MustNewConstMetric(c.zfsARCHits, prometheus.CounterValue, value, hostname)
-		case "misses":
-			misses = value
-			ch <- prometheus.MustNewConstMetric(c.zfsARCMisses, prometheus.CounterValue, value, hostname)
-		case "c":
-			ch <- prometheus.MustNewConstMetric(c.zfsARCTargetSize, prometheus.GaugeValue, value, hostname)
-		case "l2_hits":
-			ch <- prometheus.MustNewConstMetric(c.zfsARCL2Hits, prometheus.CounterValue, value, hostname)
-		case "l2_misses":
-			ch <- prometheus.MustNewConstMetric(c.zfsARCL2Misses, prometheus.CounterValue, value, hostname)
-		case "l2_size":
-			ch <- prometheus.MustNewConstMetric(c.zfsARCL2Size, prometheus.GaugeValue, value, hostname)
-		case "l2_hdr_size":
-			ch <- prometheus.MustNewConstMetric(c.zfsARCL2HeaderSize, prometheus.GaugeValue, value, hostname)
+		if handler, ok := handlers[name]; ok {
+			ch <- prometheus.MustNewConstMetric(handler.metric, handler.valueType, value, hostname)
+			if handler.trackHits {
+				hits = value
+			}
+			if handler.trackMisses {
+				misses = value
+			}
 		}
 	}
 
-	// Calculate and emit hit ratio percent (hits / (hits + misses) * 100)
-	// This is the cumulative hit ratio since boot, useful for overall ARC efficiency
+	// Calculate and emit hit ratio percent
 	total := hits + misses
 	if total > 0 {
 		hitRatioPercent := (hits / total) * 100

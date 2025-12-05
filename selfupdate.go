@@ -69,11 +69,123 @@ func compareVersions(currentVersion, newVersion string) bool {
 	return new > current
 }
 
+// findAssetURL finds the download URL for the current platform
+func findAssetURL(release *GitHubRelease) (string, error) {
+	binaryName := getBinaryName()
+	for _, asset := range release.Assets {
+		if asset.Name == binaryName {
+			return asset.BrowserDownloadURL, nil
+		}
+	}
+	return "", fmt.Errorf("no binary found for platform %s/%s", runtime.GOOS, runtime.GOARCH)
+}
+
+// getExecutablePath returns the resolved path of the current executable
+func getExecutablePath() (string, error) {
+	execPath, err := os.Executable()
+	if err != nil {
+		return "", fmt.Errorf("failed to get executable path: %w", err)
+	}
+	execPath, err = filepath.EvalSymlinks(execPath)
+	if err != nil {
+		return "", fmt.Errorf("failed to resolve executable path: %w", err)
+	}
+	return execPath, nil
+}
+
+// downloadBinary downloads a binary from URL to a temp file
+func downloadBinary(downloadURL, execPath string) (string, error) {
+	resp, err := http.Get(downloadURL)
+	if err != nil {
+		return "", fmt.Errorf("failed to download binary: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("download failed with status %d", resp.StatusCode)
+	}
+
+	tmpFile, err := os.CreateTemp(filepath.Dir(execPath), "pve-exporter-update-*")
+	if err != nil {
+		return "", fmt.Errorf("failed to create temp file: %w", err)
+	}
+	tmpPath := tmpFile.Name()
+
+	_, err = io.Copy(tmpFile, resp.Body)
+	tmpFile.Close()
+	if err != nil {
+		os.Remove(tmpPath)
+		return "", fmt.Errorf("failed to write binary: %w", err)
+	}
+
+	if err := os.Chmod(tmpPath, 0755); err != nil {
+		os.Remove(tmpPath)
+		return "", fmt.Errorf("failed to chmod binary: %w", err)
+	}
+
+	return tmpPath, nil
+}
+
+// verifyBinary checks if the downloaded binary is valid and executable
+func verifyBinary(tmpPath string) error {
+	cmd := exec.Command(tmpPath, "--version")
+	output, err := cmd.CombinedOutput()
+	if err == nil {
+		fmt.Printf("New binary verified: %s", string(output))
+		return nil
+	}
+
+	// Try with --help as fallback
+	cmd = exec.Command(tmpPath, "--help")
+	output, err = cmd.CombinedOutput()
+	if err == nil {
+		fmt.Printf("New binary verified: %s", string(output))
+		return nil
+	}
+
+	// Check if file is executable using 'file' command
+	cmd = exec.Command("file", tmpPath)
+	fileOutput, _ := cmd.Output()
+	if strings.Contains(string(fileOutput), "executable") {
+		fmt.Println("New binary verified.")
+		return nil
+	}
+
+	return fmt.Errorf("downloaded file is not a valid executable")
+}
+
+// replaceExecutable replaces the current executable with the new one
+func replaceExecutable(execPath, tmpPath string) error {
+	backupPath := execPath + ".bak"
+	if err := os.Rename(execPath, backupPath); err != nil {
+		return fmt.Errorf("failed to backup current binary: %w", err)
+	}
+
+	if err := os.Rename(tmpPath, execPath); err != nil {
+		os.Rename(backupPath, execPath) // Try to restore backup
+		return fmt.Errorf("failed to install new binary: %w", err)
+	}
+
+	os.Remove(backupPath)
+	return nil
+}
+
+// restartService attempts to restart the pve-exporter systemd service
+func restartService() {
+	fmt.Println("Restarting service...")
+	cmd := exec.Command("systemctl", "restart", "pve-exporter")
+	if err := cmd.Run(); err != nil {
+		fmt.Printf("Warning: Failed to restart service: %v\n", err)
+		fmt.Println("Please restart manually: systemctl restart pve-exporter")
+		return
+	}
+	fmt.Println("Service restarted successfully!")
+}
+
 // SelfUpdate performs the self-update process
 func SelfUpdate(currentVersion string) error {
 	fmt.Println("Checking for updates...")
 
-	// Get latest release info
 	release, err := CheckLatestVersion()
 	if err != nil {
 		return fmt.Errorf("failed to check for updates: %w", err)
@@ -82,122 +194,39 @@ func SelfUpdate(currentVersion string) error {
 	fmt.Printf("Current version: %s\n", currentVersion)
 	fmt.Printf("Latest version:  %s\n", release.TagName)
 
-	// Compare versions
 	if !compareVersions(currentVersion, release.TagName) {
 		fmt.Println("Already running the latest version!")
 		return nil
 	}
 
-	// Find the correct binary asset
-	binaryName := getBinaryName()
-	var downloadURL string
-	for _, asset := range release.Assets {
-		if asset.Name == binaryName {
-			downloadURL = asset.BrowserDownloadURL
-			break
-		}
-	}
-
-	if downloadURL == "" {
-		return fmt.Errorf("no binary found for platform %s/%s", runtime.GOOS, runtime.GOARCH)
-	}
-
-	fmt.Printf("Downloading %s...\n", binaryName)
-
-	// Get the current executable path
-	execPath, err := os.Executable()
+	downloadURL, err := findAssetURL(release)
 	if err != nil {
-		return fmt.Errorf("failed to get executable path: %w", err)
-	}
-	execPath, err = filepath.EvalSymlinks(execPath)
-	if err != nil {
-		return fmt.Errorf("failed to resolve executable path: %w", err)
+		return err
 	}
 
-	// Download new binary to temp file
-	resp, err := http.Get(downloadURL)
-	if err != nil {
-		return fmt.Errorf("failed to download binary: %w", err)
-	}
-	defer resp.Body.Close()
+	fmt.Printf("Downloading %s...\n", getBinaryName())
 
-	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("download failed with status %d", resp.StatusCode)
+	execPath, err := getExecutablePath()
+	if err != nil {
+		return err
 	}
 
-	// Create temp file in the same directory (for atomic rename)
-	tmpFile, err := os.CreateTemp(filepath.Dir(execPath), "pve-exporter-update-*")
+	tmpPath, err := downloadBinary(downloadURL, execPath)
 	if err != nil {
-		return fmt.Errorf("failed to create temp file: %w", err)
+		return err
 	}
-	tmpPath := tmpFile.Name()
 
-	// Copy downloaded content
-	_, err = io.Copy(tmpFile, resp.Body)
-	tmpFile.Close()
-	if err != nil {
+	if err := verifyBinary(tmpPath); err != nil {
 		os.Remove(tmpPath)
-		return fmt.Errorf("failed to write binary: %w", err)
+		return err
 	}
 
-	// Make executable
-	if err := os.Chmod(tmpPath, 0755); err != nil {
+	if err := replaceExecutable(execPath, tmpPath); err != nil {
 		os.Remove(tmpPath)
-		return fmt.Errorf("failed to chmod binary: %w", err)
+		return err
 	}
-
-	// Verify the new binary is executable and runs
-	// Try --version first, fall back to --help, then just check if it's executable
-	cmd := exec.Command(tmpPath, "--version")
-	output, err := cmd.CombinedOutput()
-	if err != nil {
-		// Try with --help as fallback (for older versions without --version)
-		cmd = exec.Command(tmpPath, "--help")
-		output, err = cmd.CombinedOutput()
-		if err != nil {
-			// Just check if the binary can start (it may exit quickly without args)
-			cmd = exec.Command("file", tmpPath)
-			fileOutput, _ := cmd.Output()
-			if !strings.Contains(string(fileOutput), "executable") {
-				os.Remove(tmpPath)
-				return fmt.Errorf("downloaded file is not a valid executable")
-			}
-		}
-	}
-	if len(output) > 0 {
-		fmt.Printf("New binary verified: %s", string(output))
-	} else {
-		fmt.Println("New binary verified.")
-	}
-
-	// Backup current binary
-	backupPath := execPath + ".bak"
-	if err := os.Rename(execPath, backupPath); err != nil {
-		os.Remove(tmpPath)
-		return fmt.Errorf("failed to backup current binary: %w", err)
-	}
-
-	// Move new binary to target path
-	if err := os.Rename(tmpPath, execPath); err != nil {
-		// Try to restore backup
-		os.Rename(backupPath, execPath)
-		return fmt.Errorf("failed to install new binary: %w", err)
-	}
-
-	// Remove backup
-	os.Remove(backupPath)
 
 	fmt.Println("Update successful!")
-	fmt.Println("Restarting service...")
-
-	// Restart via systemctl
-	cmd = exec.Command("systemctl", "restart", "pve-exporter")
-	if err := cmd.Run(); err != nil {
-		fmt.Printf("Warning: Failed to restart service: %v\n", err)
-		fmt.Println("Please restart manually: systemctl restart pve-exporter")
-		return nil
-	}
-
-	fmt.Println("Service restarted successfully!")
+	restartService()
 	return nil
 }
