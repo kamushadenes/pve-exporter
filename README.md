@@ -63,11 +63,11 @@ sudo useradd --system --no-create-home --shell /usr/sbin/nologin pve-exporter
 
 ### 2. Configure sudo for disk metrics (optional)
 
-For disk SMART metrics, smartctl requires root access. The `NOPASSWD` allows passwordless execution, `NOLOG` suppresses syslog entries for frequent calls:
+For disk SMART metrics, smartctl requires root access. The `NOPASSWD` allows passwordless execution, `!syslog` suppresses syslog entries for frequent calls:
 
 ```bash
-echo "Defaults:pve-exporter !syslog" | sudo tee /etc/sudoers.d/pve-exporter
-echo "pve-exporter ALL=(root) NOPASSWD: /usr/sbin/smartctl" | sudo tee -a /etc/sudoers.d/pve-exporter
+echo 'Defaults:pve-exporter !syslog' | sudo tee /etc/sudoers.d/pve-exporter
+echo 'pve-exporter ALL=(root) NOPASSWD: /usr/sbin/smartctl' | sudo tee -a /etc/sudoers.d/pve-exporter
 sudo chmod 0440 /etc/sudoers.d/pve-exporter
 ```
 
