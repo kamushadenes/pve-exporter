@@ -9,6 +9,7 @@ import (
 	"os/exec"
 	"strconv"
 	"strings"
+	"sync"
 
 	"github.com/prometheus/client_golang/prometheus"
 )
@@ -26,9 +27,16 @@ func (c *ProxmoxCollector) collectDiskMetrics(ch chan<- prometheus.Metric) {
 		return
 	}
 
+	// Collect SMART data in parallel for all disks
+	var wg sync.WaitGroup
 	for _, disk := range disks {
-		c.collectDiskSMART(ch, hostname, disk)
+		wg.Add(1)
+		go func(diskName string) {
+			defer wg.Done()
+			c.collectDiskSMART(ch, hostname, diskName)
+		}(disk)
 	}
+	wg.Wait()
 }
 
 // discoverDisks returns a list of physical disk device names (e.g., sda, nvme0n1)
