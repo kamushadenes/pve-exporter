@@ -86,6 +86,13 @@ func (c *ProxmoxCollector) collectDiskSMART(ch chan<- prometheus.Metric, hostnam
 		return
 	}
 
+	// Check if SMART status is available - virtual disks won't have this
+	smartStatus, hasSmartStatus := smartData["smart_status"].(map[string]interface{})
+	if !hasSmartStatus {
+		// No SMART status = virtual disk or unsupported, skip silently
+		return
+	}
+
 	// Determine disk type (nvme or sat/ata)
 	diskType := "unknown"
 	if device, ok := smartData["device"].(map[string]interface{}); ok {
@@ -113,12 +120,10 @@ func (c *ProxmoxCollector) collectDiskSMART(ch chan<- prometheus.Metric, hostnam
 
 	labels := []string{hostname, diskName, model, serial, diskType}
 
-	// Get health status
+	// Get health status (we verified smart_status exists above)
 	health := 0.0
-	if smartStatus, ok := smartData["smart_status"].(map[string]interface{}); ok {
-		if passed, ok := smartStatus["passed"].(bool); ok && passed {
-			health = 1.0
-		}
+	if passed, ok := smartStatus["passed"].(bool); ok && passed {
+		health = 1.0
 	}
 	ch <- prometheus.MustNewConstMetric(c.diskHealth, prometheus.GaugeValue, health, labels...)
 
