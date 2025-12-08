@@ -12,6 +12,9 @@ A professional Prometheus exporter for Proxmox VE, written in Go. It collects co
   - **VM (QEMU)**: CPU, Memory, Disk, Network I/O, Uptime, Status.
   - **LXC Containers**: CPU, Memory, Disk, Network I/O, Uptime, Status.
   - **Storage**: Usage, Availability, Total size.
+  - **ZFS**: Pool health, fragmentation, ARC statistics.
+  - **Hardware Sensors**: Temperatures, fan speeds, voltages, power (via lm-sensors).
+  - **Disk SMART**: Temperature, TBW, power-on hours, health status.
 - **Secure**: Supports API Token authentication (recommended) and standard password auth.
 - **Lightweight**: Single static binary, runs as systemd service.
 - **Easy Configuration**: Configure via environment variables or YAML file.
@@ -58,7 +61,16 @@ For production use, install the exporter as a systemd service running under a de
 sudo useradd --system --no-create-home --shell /usr/sbin/nologin pve-exporter
 ```
 
-### 2. Install binary
+### 2. Configure sudo for disk metrics (optional)
+
+For disk SMART metrics, smartctl requires root access:
+
+```bash
+echo "pve-exporter ALL=(root) NOPASSWD: /usr/sbin/smartctl" | sudo tee /etc/sudoers.d/pve-exporter
+sudo chmod 0440 /etc/sudoers.d/pve-exporter
+```
+
+### 3. Install binary
 
 ```bash
 sudo wget -O /usr/local/bin/pve-exporter \
@@ -66,7 +78,7 @@ sudo wget -O /usr/local/bin/pve-exporter \
 sudo chmod +x /usr/local/bin/pve-exporter
 ```
 
-### 3. Create configuration
+### 4. Create configuration
 
 ```bash
 sudo mkdir -p /etc/pve-exporter
@@ -97,7 +109,7 @@ sudo chmod 640 /etc/pve-exporter/config.yml
 
 > **Note:** The `token_id` format is `user@realm!tokenname` - the exclamation mark is Proxmox syntax, not an error.
 
-### 4. Create systemd service
+### 5. Create systemd service
 
 ```bash
 sudo cat > /etc/systemd/system/pve-exporter.service << 'EOF'
@@ -115,12 +127,12 @@ ExecStart=/usr/local/bin/pve-exporter -config /etc/pve-exporter/config.yml
 Restart=on-failure
 RestartSec=5
 
-# Security hardening
-NoNewPrivileges=yes
+# Security hardening (some options disabled for disk SMART metrics via sudo)
+# NoNewPrivileges=yes  # Disabled: required for sudo to work
 ProtectSystem=strict
 ProtectHome=yes
 PrivateTmp=yes
-PrivateDevices=yes
+# PrivateDevices=yes  # Disabled: required for disk access
 ProtectKernelTunables=yes
 ProtectKernelModules=yes
 ProtectControlGroups=yes
@@ -132,7 +144,7 @@ WantedBy=multi-user.target
 EOF
 ```
 
-### 5. Start and enable service
+### 6. Start and enable service
 
 ```bash
 sudo systemctl daemon-reload
@@ -325,6 +337,31 @@ The exporter exposes the following metrics at `/metrics`.
 | `pve_zfs_arc_l2_misses_total` | L2ARC misses |
 | `pve_zfs_arc_l2_size_bytes` | L2ARC size |
 | `pve_zfs_arc_l2_header_size_bytes` | L2ARC header size |
+
+### Hardware Sensor Metrics
+
+**Note:** These metrics are collected from the local host where pve-exporter runs using `lm-sensors`. Labels: `node`, `chip`, `adapter`, `sensor`.
+
+| Metric | Description |
+|--------|-------------|
+| `pve_sensor_temperature_celsius` | Temperature reading in Celsius |
+| `pve_sensor_fan_rpm` | Fan speed in RPM |
+| `pve_sensor_voltage_volts` | Voltage reading in Volts |
+| `pve_sensor_power_watts` | Power consumption in Watts |
+
+### Disk SMART Metrics
+
+**Note:** These metrics are collected from the local host using `smartctl`. Labels: `node`, `device`, `model`, `serial`, `type`.
+
+| Metric | Description |
+|--------|-------------|
+| `pve_disk_temperature_celsius` | Disk temperature in Celsius |
+| `pve_disk_power_on_hours` | Power on hours |
+| `pve_disk_health_status` | Health status (1=healthy, 0=failing) |
+| `pve_disk_data_written_bytes` | Total data written (NVMe TBW) |
+| `pve_disk_available_spare_percent` | NVMe available spare % |
+| `pve_disk_percentage_used` | NVMe percentage of life used |
+
 
 ## 🔒 Authentication & Permissions
 

@@ -144,6 +144,20 @@ type ProxmoxCollector struct {
 	zfsARCL2Misses     *prometheus.Desc
 	zfsARCL2Size       *prometheus.Desc
 	zfsARCL2HeaderSize *prometheus.Desc
+
+	// Hardware sensor metrics
+	sensorTemperature *prometheus.Desc
+	sensorFanRPM      *prometheus.Desc
+	sensorVoltage     *prometheus.Desc
+	sensorPower       *prometheus.Desc
+
+	// Disk SMART metrics
+	diskTemperature    *prometheus.Desc
+	diskPowerOnHours   *prometheus.Desc
+	diskHealth         *prometheus.Desc
+	diskDataWritten    *prometheus.Desc
+	diskAvailableSpare *prometheus.Desc
+	diskPercentageUsed *prometheus.Desc
 }
 
 // NewProxmoxCollector creates a new Proxmox collector
@@ -711,6 +725,60 @@ func NewProxmoxCollector(cfg *config.ProxmoxConfig) *ProxmoxCollector {
 			"ZFS L2ARC header size in bytes",
 			[]string{"node"}, nil,
 		),
+
+		// Hardware sensor metrics
+		sensorTemperature: prometheus.NewDesc(
+			"pve_sensor_temperature_celsius",
+			"Hardware sensor temperature in Celsius",
+			[]string{"node", "chip", "adapter", "sensor"}, nil,
+		),
+		sensorFanRPM: prometheus.NewDesc(
+			"pve_sensor_fan_rpm",
+			"Hardware sensor fan speed in RPM",
+			[]string{"node", "chip", "adapter", "sensor"}, nil,
+		),
+		sensorVoltage: prometheus.NewDesc(
+			"pve_sensor_voltage_volts",
+			"Hardware sensor voltage in Volts",
+			[]string{"node", "chip", "adapter", "sensor"}, nil,
+		),
+		sensorPower: prometheus.NewDesc(
+			"pve_sensor_power_watts",
+			"Hardware sensor power consumption in Watts",
+			[]string{"node", "chip", "adapter", "sensor"}, nil,
+		),
+
+		// Disk SMART metrics
+		diskTemperature: prometheus.NewDesc(
+			"pve_disk_temperature_celsius",
+			"Disk temperature in Celsius",
+			[]string{"node", "device", "model", "serial", "type"}, nil,
+		),
+		diskPowerOnHours: prometheus.NewDesc(
+			"pve_disk_power_on_hours",
+			"Disk power on hours",
+			[]string{"node", "device", "model", "serial", "type"}, nil,
+		),
+		diskHealth: prometheus.NewDesc(
+			"pve_disk_health_status",
+			"Disk health status (1=healthy, 0=failing)",
+			[]string{"node", "device", "model", "serial", "type"}, nil,
+		),
+		diskDataWritten: prometheus.NewDesc(
+			"pve_disk_data_written_bytes",
+			"Total data written to disk in bytes (NVMe TBW)",
+			[]string{"node", "device", "model", "serial", "type"}, nil,
+		),
+		diskAvailableSpare: prometheus.NewDesc(
+			"pve_disk_available_spare_percent",
+			"NVMe available spare percentage",
+			[]string{"node", "device", "model", "serial", "type"}, nil,
+		),
+		diskPercentageUsed: prometheus.NewDesc(
+			"pve_disk_percentage_used",
+			"NVMe percentage of life used",
+			[]string{"node", "device", "model", "serial", "type"}, nil,
+		),
 	}
 }
 
@@ -824,6 +892,20 @@ func (c *ProxmoxCollector) Describe(ch chan<- *prometheus.Desc) {
 	ch <- c.zfsARCL2Misses
 	ch <- c.zfsARCL2Size
 	ch <- c.zfsARCL2HeaderSize
+
+	// Hardware sensors
+	ch <- c.sensorTemperature
+	ch <- c.sensorFanRPM
+	ch <- c.sensorVoltage
+	ch <- c.sensorPower
+
+	// Disk SMART
+	ch <- c.diskTemperature
+	ch <- c.diskPowerOnHours
+	ch <- c.diskHealth
+	ch <- c.diskDataWritten
+	ch <- c.diskAvailableSpare
+	ch <- c.diskPercentageUsed
 }
 
 // Collect implements prometheus.Collector
@@ -861,7 +943,7 @@ func (c *ProxmoxCollector) Collect(ch chan<- prometheus.Metric) {
 	// Run all collection functions in parallel for better performance
 	var wg sync.WaitGroup
 
-	wg.Add(4)
+	wg.Add(6)
 
 	go func() {
 		defer wg.Done()
@@ -881,6 +963,16 @@ func (c *ProxmoxCollector) Collect(ch chan<- prometheus.Metric) {
 	go func() {
 		defer wg.Done()
 		c.collectZFSMetricsWithNodes(ch, nodes)
+	}()
+
+	go func() {
+		defer wg.Done()
+		c.collectSensorsMetrics(ch)
+	}()
+
+	go func() {
+		defer wg.Done()
+		c.collectDiskMetrics(ch)
 	}()
 
 	wg.Wait()
