@@ -128,11 +128,9 @@ Restart=on-failure
 RestartSec=5
 
 # Security hardening (some options disabled for disk SMART metrics via sudo)
-# NoNewPrivileges=yes  # Disabled: required for sudo to work
 ProtectSystem=strict
 ProtectHome=yes
 PrivateTmp=yes
-# PrivateDevices=yes  # Disabled: required for disk access
 ProtectKernelTunables=yes
 ProtectKernelModules=yes
 ProtectControlGroups=yes
