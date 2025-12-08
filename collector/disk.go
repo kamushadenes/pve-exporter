@@ -63,24 +63,19 @@ func discoverDisks() []string {
 func (c *ProxmoxCollector) collectDiskSMART(ch chan<- prometheus.Metric, hostname, diskName string) {
 	devicePath := "/dev/" + diskName
 
-	// Run smartctl with JSON output
-	// Use sudo -n (non-interactive) because smartctl requires root access
-	// Use full paths to avoid PATH issues in systemd services
-	// Requires: echo "Defaults:pve-exporter !syslog" > /etc/sudoers.d/pve-exporter
-	//           echo "pve-exporter ALL=(root) NOPASSWD: /usr/sbin/smartctl" >> /etc/sudoers.d/pve-exporter
-	cmd := exec.Command("/usr/bin/sudo", "-n", "/usr/sbin/smartctl", "-j", "-a", devicePath)
-
-	// Capture stdout - smartctl returns non-zero exit codes for various
-	// conditions but still outputs valid JSON
+	// 1. Try direct execution first (preferred, silent if capabilities are set)
+	cmd := exec.Command("/usr/sbin/smartctl", "-j", "-a", devicePath)
 	var stdout bytes.Buffer
 	cmd.Stdout = &stdout
-	cmd.Run() // Ignore error - we check output instead
+	cmd.Run() // Ignore error, check output
 
 	output := stdout.Bytes()
+
 	if len(output) == 0 {
 		return
 	}
 
+	// Verify if we got valid JSON output
 	var smartData map[string]interface{}
 	if err := json.Unmarshal(output, &smartData); err != nil {
 		log.Printf("Error parsing smartctl JSON for %s: %v", diskName, err)
