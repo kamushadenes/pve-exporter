@@ -164,6 +164,33 @@ func (c *ProxmoxCollector) parseNVMeMetrics(ch chan<- prometheus.Metric, data ma
 	}
 }
 
+// extractRawValue extracts the raw value from a SMART attribute
+func extractRawValue(rawMap map[string]interface{}) (float64, bool) {
+	if rawValue, ok := rawMap["value"].(float64); ok {
+		return rawValue, true
+	}
+	// Try string value
+	if rawStr, ok := rawMap["string"].(string); ok {
+		fields := strings.Fields(rawStr)
+		if len(fields) > 0 {
+			if v, err := strconv.ParseFloat(fields[0], 64); err == nil {
+				return v, true
+			}
+		}
+	}
+	return 0, false
+}
+
+// getTemperatureFromRoot extracts temperature from root level data
+func getTemperatureFromRoot(data map[string]interface{}) (float64, bool) {
+	if temp, ok := data["temperature"].(map[string]interface{}); ok {
+		if current, ok := temp["current"].(float64); ok {
+			return current, true
+		}
+	}
+	return 0, false
+}
+
 // parseATAMetrics extracts metrics from ATA/SATA SMART data
 func (c *ProxmoxCollector) parseATAMetrics(ch chan<- prometheus.Metric, data map[string]interface{}, labels []string) {
 	// Get power on hours from general info
@@ -173,63 +200,58 @@ func (c *ProxmoxCollector) parseATAMetrics(ch chan<- prometheus.Metric, data map
 		}
 	}
 
-	// Track if we already emitted temperature to avoid duplicates
+	hasTemperature := c.parseATASmartAttributes(ch, data, labels)
+
+	// Fallback: try temperature from root level
+	if !hasTemperature {
+		if temp, ok := getTemperatureFromRoot(data); ok {
+			ch <- prometheus.MustNewConstMetric(c.diskTemperature, prometheus.GaugeValue, temp, labels...)
+		}
+	}
+}
+
+// parseATASmartAttributes parses the SMART attributes table
+func (c *ProxmoxCollector) parseATASmartAttributes(ch chan<- prometheus.Metric, data map[string]interface{}, labels []string) bool {
 	hasTemperature := false
 
-	// Parse SMART attributes table
 	ataAttrs, ok := data["ata_smart_attributes"].(map[string]interface{})
-	if ok {
-		table, ok := ataAttrs["table"].([]interface{})
-		if ok {
-			for _, attr := range table {
-				attrMap, ok := attr.(map[string]interface{})
-				if !ok {
-					continue
-				}
+	if !ok {
+		return false
+	}
 
-				id, ok := attrMap["id"].(float64)
-				if !ok {
-					continue
-				}
+	table, ok := ataAttrs["table"].([]interface{})
+	if !ok {
+		return false
+	}
 
-				rawMap, ok := attrMap["raw"].(map[string]interface{})
-				if !ok {
-					continue
-				}
+	for _, attr := range table {
+		attrMap, ok := attr.(map[string]interface{})
+		if !ok {
+			continue
+		}
 
-				rawValue, ok := rawMap["value"].(float64)
-				if !ok {
-					// Try string value
-					if rawStr, ok := rawMap["string"].(string); ok {
-						// Parse first number from string (e.g., "34 (Min/Max 33/47)")
-						fields := strings.Fields(rawStr)
-						if len(fields) > 0 {
-							if v, err := strconv.ParseFloat(fields[0], 64); err == nil {
-								rawValue = v
-							}
-						}
-					}
-				}
+		id, ok := attrMap["id"].(float64)
+		if !ok {
+			continue
+		}
 
-				switch int(id) {
-				case 194: // Temperature_Celsius
-					ch <- prometheus.MustNewConstMetric(c.diskTemperature, prometheus.GaugeValue, rawValue, labels...)
-					hasTemperature = true
-				case 9: // Power_On_Hours (backup if not in power_on_time)
-					// Already handled above, skip
-				}
-			}
+		rawMap, ok := attrMap["raw"].(map[string]interface{})
+		if !ok {
+			continue
+		}
+
+		rawValue, ok := extractRawValue(rawMap)
+		if !ok {
+			continue
+		}
+
+		if int(id) == 194 { // Temperature_Celsius
+			ch <- prometheus.MustNewConstMetric(c.diskTemperature, prometheus.GaugeValue, rawValue, labels...)
+			hasTemperature = true
 		}
 	}
 
-	// Fallback: try temperature from root level (only if not already emitted)
-	if !hasTemperature {
-		if temp, ok := data["temperature"].(map[string]interface{}); ok {
-			if current, ok := temp["current"].(float64); ok {
-				ch <- prometheus.MustNewConstMetric(c.diskTemperature, prometheus.GaugeValue, current, labels...)
-			}
-		}
-	}
+	return hasTemperature
 }
 
 // getStringField safely extracts a string field from a map

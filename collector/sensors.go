@@ -27,45 +27,88 @@ func getHostname() string {
 	return cachedHostname
 }
 
-// sensorReading holds a sensor reading with its type
-type sensorReading struct {
-	value      float64
-	metricType string // "temp", "fan", "in", "power"
+// parseSensorKey determines the metric type from a sensor key
+// Returns the metric type ("temp", "fan", "in", "power") or empty string if not relevant
+func parseSensorKey(key string) (metricType string, isPriority bool) {
+	switch {
+	case strings.HasPrefix(key, "temp") && strings.HasSuffix(key, "_input"):
+		return "temp", true
+	case strings.HasPrefix(key, "fan") && strings.HasSuffix(key, "_input"):
+		return "fan", true
+	case strings.HasPrefix(key, "in") && strings.HasSuffix(key, "_input"):
+		return "in", true
+	case strings.HasPrefix(key, "power") && strings.HasSuffix(key, "_input"):
+		return "power", true // power_input has priority
+	case strings.HasPrefix(key, "power") && strings.HasSuffix(key, "_average"):
+		return "power", false // power_average is fallback
+	default:
+		return "", false
+	}
+}
+
+// emitSensorMetric emits a single sensor metric to the channel
+func (c *ProxmoxCollector) emitSensorMetric(ch chan<- prometheus.Metric, metricType string, value float64, labels []string) {
+	switch metricType {
+	case "temp":
+		ch <- prometheus.MustNewConstMetric(c.sensorTemperature, prometheus.GaugeValue, value, labels...)
+	case "fan":
+		ch <- prometheus.MustNewConstMetric(c.sensorFanRPM, prometheus.GaugeValue, value, labels...)
+	case "in":
+		ch <- prometheus.MustNewConstMetric(c.sensorVoltage, prometheus.GaugeValue, value, labels...)
+	case "power":
+		ch <- prometheus.MustNewConstMetric(c.sensorPower, prometheus.GaugeValue, value, labels...)
+	}
+}
+
+// processSensor processes a single sensor's data and returns readings
+func processSensor(sensorMap map[string]interface{}) map[string]float64 {
+	readings := make(map[string]float64)
+	hasPriority := make(map[string]bool)
+
+	for key, value := range sensorMap {
+		val, ok := value.(float64)
+		if !ok {
+			continue
+		}
+
+		metricType, isPriority := parseSensorKey(key)
+		if metricType == "" {
+			continue
+		}
+
+		// Only update if this is higher priority or no existing reading
+		if isPriority || !hasPriority[metricType] {
+			readings[metricType] = val
+			hasPriority[metricType] = isPriority
+		}
+	}
+	return readings
 }
 
 // collectSensorsMetrics collects hardware sensor metrics using lm-sensors
 func (c *ProxmoxCollector) collectSensorsMetrics(ch chan<- prometheus.Metric) {
-	// Execute sensors -j for JSON output
 	cmd := exec.Command("sensors", "-j")
 	output, err := cmd.Output()
 	if err != nil {
-		// sensors might not be installed or no sensors detected
 		return
 	}
 
 	hostname := getHostname()
 
-	// Parse JSON output
 	var sensorsData map[string]interface{}
 	if err := json.Unmarshal(output, &sensorsData); err != nil {
 		log.Printf("Error parsing sensors JSON: %v", err)
 		return
 	}
 
-	// Iterate over each chip
 	for chipName, chipData := range sensorsData {
 		chipMap, ok := chipData.(map[string]interface{})
 		if !ok {
 			continue
 		}
 
-		// Get adapter name
-		adapter := ""
-		if adapterVal, ok := chipMap["Adapter"].(string); ok {
-			adapter = adapterVal
-		}
+		adapter, _ := chipMap["Adapter"].(string)
 
-		// Iterate over sensors in this chip
 		for sensorName, sensorData := range chipMap {
 			if sensorName == "Adapter" {
 				continue
@@ -76,66 +119,11 @@ func (c *ProxmoxCollector) collectSensorsMetrics(ch chan<- prometheus.Metric) {
 				continue
 			}
 
-			// Collect readings for this sensor, preferring _input over _average
-			readings := make(map[string]*sensorReading)
+			readings := processSensor(sensorMap)
+			labels := []string{hostname, chipName, adapter, sensorName}
 
-			for key, value := range sensorMap {
-				val, ok := value.(float64)
-				if !ok {
-					continue
-				}
-
-				// Determine metric type from key prefix/suffix
-				switch {
-				case strings.HasPrefix(key, "temp") && strings.HasSuffix(key, "_input"):
-					readings["temp"] = &sensorReading{value: val, metricType: "temp"}
-				case strings.HasPrefix(key, "fan") && strings.HasSuffix(key, "_input"):
-					readings["fan"] = &sensorReading{value: val, metricType: "fan"}
-				case strings.HasPrefix(key, "in") && strings.HasSuffix(key, "_input"):
-					readings["in"] = &sensorReading{value: val, metricType: "in"}
-				case strings.HasPrefix(key, "power") && strings.HasSuffix(key, "_input"):
-					// power_input has priority over power_average
-					readings["power"] = &sensorReading{value: val, metricType: "power"}
-				case strings.HasPrefix(key, "power") && strings.HasSuffix(key, "_average"):
-					// Only use power_average if power_input not present
-					if _, exists := readings["power"]; !exists {
-						readings["power"] = &sensorReading{value: val, metricType: "power"}
-					}
-				}
-			}
-
-			// Emit metrics
-			for _, reading := range readings {
-				switch reading.metricType {
-				case "temp":
-					ch <- prometheus.MustNewConstMetric(
-						c.sensorTemperature,
-						prometheus.GaugeValue,
-						reading.value,
-						hostname, chipName, adapter, sensorName,
-					)
-				case "fan":
-					ch <- prometheus.MustNewConstMetric(
-						c.sensorFanRPM,
-						prometheus.GaugeValue,
-						reading.value,
-						hostname, chipName, adapter, sensorName,
-					)
-				case "in":
-					ch <- prometheus.MustNewConstMetric(
-						c.sensorVoltage,
-						prometheus.GaugeValue,
-						reading.value,
-						hostname, chipName, adapter, sensorName,
-					)
-				case "power":
-					ch <- prometheus.MustNewConstMetric(
-						c.sensorPower,
-						prometheus.GaugeValue,
-						reading.value,
-						hostname, chipName, adapter, sensorName,
-					)
-				}
+			for metricType, value := range readings {
+				c.emitSensorMetric(ch, metricType, value, labels)
 			}
 		}
 	}
