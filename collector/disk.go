@@ -64,10 +64,10 @@ func (c *ProxmoxCollector) collectDiskSMART(ch chan<- prometheus.Metric, hostnam
 	devicePath := "/dev/" + diskName
 
 	// Run smartctl with JSON output
-	// Use sudo -n (non-interactive) because smartctl requires root access
-	// Use full paths to avoid PATH issues in systemd services
-	// Requires: echo "pve-exporter ALL=(root) NOPASSWD: /usr/sbin/smartctl" > /etc/sudoers.d/pve-exporter
-	cmd := exec.Command("/usr/bin/sudo", "-n", "/usr/sbin/smartctl", "-j", "-a", devicePath)
+	// Option 1: setcap cap_sys_rawio+ep /usr/sbin/smartctl (no logging, preferred)
+	// Option 2: sudoers with NOPASSWD (logs to syslog)
+	// Try direct call first (works with setcap), fall back to sudo
+	cmd := exec.Command("/usr/sbin/smartctl", "-j", "-a", devicePath)
 
 	// Capture stdout - smartctl returns non-zero exit codes for various
 	// conditions but still outputs valid JSON
