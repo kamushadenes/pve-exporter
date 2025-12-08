@@ -5,7 +5,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"log"
-	"os"
 	"os/exec"
 	"strconv"
 	"strings"
@@ -16,10 +15,7 @@ import (
 
 // collectDiskMetrics collects disk SMART metrics using smartctl
 func (c *ProxmoxCollector) collectDiskMetrics(ch chan<- prometheus.Metric) {
-	hostname, _ := os.Hostname()
-	if hostname == "" {
-		hostname = "localhost"
-	}
+	hostname := getHostname()
 
 	// Discover physical disks using lsblk
 	disks := discoverDisks()

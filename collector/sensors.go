@@ -6,9 +6,26 @@ import (
 	"os"
 	"os/exec"
 	"strings"
+	"sync"
 
 	"github.com/prometheus/client_golang/prometheus"
 )
+
+// cachedHostname stores hostname to avoid repeated os.Hostname() calls
+var (
+	cachedHostname     string
+	cachedHostnameOnce sync.Once
+)
+
+func getHostname() string {
+	cachedHostnameOnce.Do(func() {
+		cachedHostname, _ = os.Hostname()
+		if cachedHostname == "" {
+			cachedHostname = "localhost"
+		}
+	})
+	return cachedHostname
+}
 
 // sensorReading holds a sensor reading with its type
 type sensorReading struct {
@@ -26,10 +43,7 @@ func (c *ProxmoxCollector) collectSensorsMetrics(ch chan<- prometheus.Metric) {
 		return
 	}
 
-	hostname, _ := os.Hostname()
-	if hostname == "" {
-		hostname = "localhost"
-	}
+	hostname := getHostname()
 
 	// Parse JSON output
 	var sensorsData map[string]interface{}
@@ -71,46 +85,22 @@ func (c *ProxmoxCollector) collectSensorsMetrics(ch chan<- prometheus.Metric) {
 					continue
 				}
 
-				var metricType string
-				var baseKey string
-
-				if strings.HasPrefix(key, "temp") && strings.HasSuffix(key, "_input") {
-					metricType = "temp"
-					baseKey = "temp"
-				} else if strings.HasPrefix(key, "fan") && strings.HasSuffix(key, "_input") {
-					metricType = "fan"
-					baseKey = "fan"
-				} else if strings.HasPrefix(key, "in") && strings.HasSuffix(key, "_input") {
-					metricType = "in"
-					baseKey = "in"
-				} else if strings.HasPrefix(key, "power") {
-					if strings.HasSuffix(key, "_input") {
-						metricType = "power"
-						baseKey = "power_input"
-					} else if strings.HasSuffix(key, "_average") {
-						metricType = "power"
-						baseKey = "power_average"
+				// Determine metric type from key prefix/suffix
+				switch {
+				case strings.HasPrefix(key, "temp") && strings.HasSuffix(key, "_input"):
+					readings["temp"] = &sensorReading{value: val, metricType: "temp"}
+				case strings.HasPrefix(key, "fan") && strings.HasSuffix(key, "_input"):
+					readings["fan"] = &sensorReading{value: val, metricType: "fan"}
+				case strings.HasPrefix(key, "in") && strings.HasSuffix(key, "_input"):
+					readings["in"] = &sensorReading{value: val, metricType: "in"}
+				case strings.HasPrefix(key, "power") && strings.HasSuffix(key, "_input"):
+					// power_input has priority over power_average
+					readings["power"] = &sensorReading{value: val, metricType: "power"}
+				case strings.HasPrefix(key, "power") && strings.HasSuffix(key, "_average"):
+					// Only use power_average if power_input not present
+					if _, exists := readings["power"]; !exists {
+						readings["power"] = &sensorReading{value: val, metricType: "power"}
 					}
-				} else {
-					continue
-				}
-
-				if metricType == "" {
-					continue
-				}
-
-				// For power, prefer _input over _average
-				if metricType == "power" {
-					if existing, exists := readings["power"]; exists {
-						// Only overwrite if this is _input (higher priority)
-						if baseKey == "power_input" {
-							existing.value = val
-						}
-					} else {
-						readings["power"] = &sensorReading{value: val, metricType: metricType}
-					}
-				} else {
-					readings[metricType] = &sensorReading{value: val, metricType: metricType}
 				}
 			}
 
