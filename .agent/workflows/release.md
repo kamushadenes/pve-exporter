@@ -4,6 +4,8 @@ description: How to release a new version of pve-exporter
 
 # Release Procedure
 
+> **Note**: GitHub CLI (`gh`) is installed and can be used as alternative to git commands (e.g., `gh release create`).
+
 To ensure release notes are correctly populated in GitHub Releases, follow this procedure:
 
 1.  **Prepare Changes**: Ensure all code changes are committed.
