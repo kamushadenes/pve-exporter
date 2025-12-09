@@ -3266,83 +3266,118 @@
                     "fieldConfig": {
                         "defaults": {
                             "color": {
-                                "mode": "palette-classic"
+                                "mode": "thresholds"
                             },
                             "custom": {
-                                "axisCenteredZero": false,
-                                "axisColorMode": "text",
-                                "axisLabel": "",
-                                "axisPlacement": "auto",
-                                "barAlignment": 0,
-                                "drawStyle": "line",
-                                "fillOpacity": 20,
-                                "gradientMode": "none",
-                                "hideFrom": {
-                                    "legend": false,
-                                    "tooltip": false,
-                                    "viz": false
+                                "align": "auto",
+                                "cellOptions": {
+                                    "type": "auto"
                                 },
-                                "lineInterpolation": "smooth",
-                                "lineWidth": 2,
-                                "pointSize": 5,
-                                "scaleDistribution": {
-                                    "type": "linear"
-                                },
-                                "showPoints": "never",
-                                "spanNulls": false,
-                                "stacking": {
-                                    "group": "A",
-                                    "mode": "none"
-                                },
-                                "thresholdsStyle": {
-                                    "mode": "off"
-                                }
+                                "inspect": false
                             },
                             "mappings": [],
                             "thresholds": {
                                 "mode": "absolute",
                                 "steps": [
                                     {
-                                        "color": "green",
+                                        "color": "blue",
                                         "value": null
                                     }
                                 ]
                             },
-                            "unit": "Bps"
+                            "unit": "decbytes"
                         },
-                        "overrides": []
+                        "overrides": [
+                            {
+                                "matcher": {
+                                    "id": "byName",
+                                    "options": "Device"
+                                },
+                                "properties": [
+                                    {
+                                        "id": "custom.width",
+                                        "value": 120
+                                    }
+                                ]
+                            },
+                            {
+                                "matcher": {
+                                    "id": "byName",
+                                    "options": "Model"
+                                },
+                                "properties": [
+                                    {
+                                        "id": "custom.width",
+                                        "value": 200
+                                    }
+                                ]
+                            },
+                            {
+                                "matcher": {
+                                    "id": "byName",
+                                    "options": "Written"
+                                },
+                                "properties": [
+                                    {
+                                        "id": "unit",
+                                        "value": "decbytes"
+                                    }
+                                ]
+                            }
+                        ]
                     },
                     "gridPos": {
-                        "h": 8,
+                        "h": 6,
                         "w": 24,
                         "x": 0,
                         "y": 52
                     },
                     "id": 256,
                     "options": {
-                        "legend": {
-                            "calcs": [
-                                "mean",
-                                "max"
+                        "cellHeight": "md",
+                        "footer": {
+                            "countRows": false,
+                            "fields": "",
+                            "reducer": [
+                                "sum"
                             ],
-                            "displayMode": "table",
-                            "placement": "bottom",
-                            "showLegend": true
+                            "show": false
                         },
-                        "tooltip": {
-                            "mode": "multi",
-                            "sort": "desc"
-                        }
+                        "showHeader": true
                     },
                     "targets": [
                         {
-                            "expr": "rate(pve_disk_data_written_bytes{node=~\"$node.*\"}[5m])",
-                            "legendFormat": "{{device}} ({{model}})",
+                            "expr": "increase(pve_disk_data_written_bytes{node=~\"$node.*\"}[$__range])",
+                            "format": "table",
+                            "instant": true,
+                            "legendFormat": "",
                             "refId": "A"
                         }
                     ],
-                    "title": "SMART Write Rate (TBW Growth)",
-                    "type": "timeseries"
+                    "title": "Data Written (Selected Time Range)",
+                    "transformations": [
+                        {
+                            "id": "organize",
+                            "options": {
+                                "excludeByName": {
+                                    "Time": true,
+                                    "__name__": true,
+                                    "job": true,
+                                    "instance": true,
+                                    "node": true,
+                                    "serial": true,
+                                    "type": true
+                                },
+                                "indexByName": {},
+                                "renameByName": {
+                                    "device": "Device",
+                                    "model": "Model",
+                                    "Value": "Written"
+                                }
+                            }
+                        }
+                    ],
+                    "type": "table"
                 },
                 {
                     "datasource": {
