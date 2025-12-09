@@ -2518,12 +2518,12 @@
                                         "0": {
                                             "color": "red",
                                             "index": 1,
-                                            "text": "FAILING"
+                                            "text": "⚠️ FAILING"
                                         },
                                         "1": {
                                             "color": "green",
                                             "index": 0,
-                                            "text": "HEALTHY"
+                                            "text": "✅ HEALTHY"
                                         }
                                     },
                                     "type": "value"
@@ -2546,7 +2546,7 @@
                         "overrides": []
                     },
                     "gridPos": {
-                        "h": 5,
+                        "h": 8,
                         "w": 24,
                         "x": 0,
                         "y": 26
@@ -2642,7 +2642,7 @@
                         "h": 8,
                         "w": 12,
                         "x": 0,
-                        "y": 31
+                        "y": 34
                     },
                     "id": 252,
                     "options": {
@@ -2708,7 +2708,7 @@
                         "h": 8,
                         "w": 12,
                         "x": 12,
-                        "y": 31
+                        "y": 34
                     },
                     "id": 253,
                     "options": {
@@ -2746,6 +2746,13 @@
                             "color": {
                                 "mode": "thresholds"
                             },
+                            "custom": {
+                                "align": "auto",
+                                "cellOptions": {
+                                    "type": "auto"
+                                },
+                                "inspect": false
+                            },
                             "mappings": [],
                             "thresholds": {
                                 "mode": "absolute",
@@ -2755,41 +2762,157 @@
                                         "value": null
                                     }
                                 ]
-                            },
-                            "unit": "h"
+                            }
                         },
-                        "overrides": []
+                        "overrides": [
+                            {
+                                "matcher": {
+                                    "id": "byName",
+                                    "options": "Power-On"
+                                },
+                                "properties": [
+                                    {
+                                        "id": "unit",
+                                        "value": "h"
+                                    },
+                                    {
+                                        "id": "custom.width",
+                                        "value": 100
+                                    }
+                                ]
+                            },
+                            {
+                                "matcher": {
+                                    "id": "byName",
+                                    "options": "TBW"
+                                },
+                                "properties": [
+                                    {
+                                        "id": "unit",
+                                        "value": "decbytes"
+                                    },
+                                    {
+                                        "id": "custom.width",
+                                        "value": 120
+                                    }
+                                ]
+                            },
+                            {
+                                "matcher": {
+                                    "id": "byName",
+                                    "options": "Spare %"
+                                },
+                                "properties": [
+                                    {
+                                        "id": "unit",
+                                        "value": "percent"
+                                    },
+                                    {
+                                        "id": "custom.width",
+                                        "value": 80
+                                    }
+                                ]
+                            }
+                        ]
                     },
                     "gridPos": {
-                        "h": 5,
-                        "w": 12,
+                        "h": 10,
+                        "w": 24,
                         "x": 0,
-                        "y": 39
+                        "y": 42
                     },
                     "id": 254,
                     "options": {
-                        "colorMode": "value",
-                        "graphMode": "none",
-                        "justifyMode": "auto",
-                        "orientation": "auto",
-                        "reduceOptions": {
-                            "calcs": [
-                                "lastNotNull"
-                            ],
+                        "cellHeight": "md",
+                        "footer": {
+                            "countRows": false,
                             "fields": "",
-                            "values": false
+                            "reducer": [
+                                "sum"
+                            ],
+                            "show": false
                         },
-                        "textMode": "value_and_name"
+                        "showHeader": true
                     },
                     "targets": [
                         {
                             "expr": "pve_disk_power_on_hours{node=~\"$node.*\"}",
-                            "legendFormat": "{{device}} ({{model}})",
-                            "refId": "A"
+                            "format": "table",
+                            "instant": true,
+                            "legendFormat": "",
+                            "refId": "hours"
+                        },
+                        {
+                            "expr": "pve_disk_data_written_bytes{node=~\"$node.*\"}",
+                            "format": "table",
+                            "instant": true,
+                            "legendFormat": "",
+                            "refId": "tbw"
+                        },
+                        {
+                            "expr": "pve_disk_available_spare_percent{node=~\"$node.*\"}",
+                            "format": "table",
+                            "instant": true,
+                            "legendFormat": "",
+                            "refId": "spare"
                         }
                     ],
-                    "title": "Power-On Hours",
-                    "type": "stat"
+                    "title": "Disk Details",
+                    "transformations": [
+                        {
+                            "id": "seriesToColumns",
+                            "options": {
+                                "byField": "device"
+                            }
+                        },
+                        {
+                            "id": "organize",
+                            "options": {
+                                "excludeByName": {
+                                    "Time": true,
+                                    "Time 1": true,
+                                    "Time 2": true,
+                                    "Time 3": true,
+                                    "__name__": true,
+                                    "__name__ 1": true,
+                                    "__name__ 2": true,
+                                    "__name__ 3": true,
+                                    "job": true,
+                                    "job 1": true,
+                                    "job 2": true,
+                                    "job 3": true,
+                                    "instance": true,
+                                    "instance 1": true,
+                                    "instance 2": true,
+                                    "instance 3": true,
+                                    "node 1": true,
+                                    "node 2": true,
+                                    "node 3": true,
+                                    "model 1": true,
+                                    "model 2": true,
+                                    "model 3": true,
+                                    "serial 1": true,
+                                    "serial 2": true,
+                                    "serial 3": true,
+                                    "type 1": true,
+                                    "type 2": true,
+                                    "type 3": true
+                                },
+                                "indexByName": {},
+                                "renameByName": {
+                                    "device": "Device",
+                                    "model": "Model",
+                                    "serial": "Serial",
+                                    "type": "Type",
+                                    "node": "Node",
+                                    "Value #hours": "Power-On",
+                                    "Value #tbw": "TBW",
+                                    "Value #spare": "Spare %"
+                                }
+                            }
+                        }
+                    ],
+                    "type": "table"
                 },
                 {
                     "datasource": {
@@ -2799,52 +2922,83 @@
                     "fieldConfig": {
                         "defaults": {
                             "color": {
-                                "mode": "thresholds"
+                                "mode": "palette-classic"
+                            },
+                            "custom": {
+                                "axisCenteredZero": false,
+                                "axisColorMode": "text",
+                                "axisLabel": "",
+                                "axisPlacement": "auto",
+                                "barAlignment": 0,
+                                "drawStyle": "line",
+                                "fillOpacity": 20,
+                                "gradientMode": "none",
+                                "hideFrom": {
+                                    "legend": false,
+                                    "tooltip": false,
+                                    "viz": false
+                                },
+                                "lineInterpolation": "smooth",
+                                "lineWidth": 2,
+                                "pointSize": 5,
+                                "scaleDistribution": {
+                                    "type": "linear"
+                                },
+                                "showPoints": "never",
+                                "spanNulls": false,
+                                "stacking": {
+                                    "group": "A",
+                                    "mode": "none"
+                                },
+                                "thresholdsStyle": {
+                                    "mode": "off"
+                                }
                             },
                             "mappings": [],
                             "thresholds": {
                                 "mode": "absolute",
                                 "steps": [
                                     {
-                                        "color": "blue",
+                                        "color": "green",
                                         "value": null
                                     }
                                 ]
                             },
-                            "unit": "bytes"
+                            "unit": "Bps"
                         },
                         "overrides": []
                     },
                     "gridPos": {
-                        "h": 5,
-                        "w": 12,
-                        "x": 12,
-                        "y": 39
+                        "h": 8,
+                        "w": 24,
+                        "x": 0,
+                        "y": 52
                     },
-                    "id": 255,
+                    "id": 256,
                     "options": {
-                        "colorMode": "value",
-                        "graphMode": "none",
-                        "justifyMode": "auto",
-                        "orientation": "auto",
-                        "reduceOptions": {
+                        "legend": {
                             "calcs": [
-                                "lastNotNull"
+                                "mean",
+                                "max"
                             ],
-                            "fields": "",
-                            "values": false
+                            "displayMode": "table",
+                            "placement": "bottom",
+                            "showLegend": true
                         },
-                        "textMode": "value_and_name"
+                        "tooltip": {
+                            "mode": "multi",
+                            "sort": "desc"
+                        }
                     },
                     "targets": [
                         {
-                            "expr": "pve_disk_data_written_bytes{node=~\"$node.*\"}",
+                            "expr": "rate(pve_disk_data_written_bytes{node=~\"$node.*\"}[5m])",
                             "legendFormat": "{{device}} ({{model}})",
                             "refId": "A"
                         }
                     ],
-                    "title": "NVMe Total Bytes Written (TBW)",
-                    "type": "stat"
+                    "title": "Disk Write Rate (TBW Growth)",
+                    "type": "timeseries"
                 }
             ],
             "title": "💽 Disk SMART",
