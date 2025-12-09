@@ -1,56 +1,56 @@
 {
-    "__elements": {},
     "__inputs": [
         {
-            "description": "",
-            "label": "Prometheus",
             "name": "DS_PROMETHEUS",
+            "label": "Prometheus",
+            "description": "",
+            "type": "datasource",
             "pluginId": "prometheus",
-            "pluginName": "Prometheus",
-            "type": "datasource"
+            "pluginName": "Prometheus"
         }
     ],
+    "__elements": {},
     "__requires": [
         {
+            "type": "grafana",
             "id": "grafana",
             "name": "Grafana",
-            "type": "grafana",
             "version": "10.0.0"
         },
         {
+            "type": "datasource",
             "id": "prometheus",
             "name": "Prometheus",
-            "type": "datasource",
             "version": "1.0.0"
         },
         {
+            "type": "panel",
             "id": "stat",
             "name": "Stat",
-            "type": "panel",
             "version": ""
         },
         {
+            "type": "panel",
             "id": "gauge",
             "name": "Gauge",
-            "type": "panel",
             "version": ""
         },
         {
+            "type": "panel",
             "id": "timeseries",
             "name": "Time series",
-            "type": "panel",
             "version": ""
         },
         {
+            "type": "panel",
             "id": "table",
             "name": "Table",
-            "type": "panel",
             "version": ""
         },
         {
+            "type": "panel",
             "id": "bargauge",
             "name": "Bar gauge",
-            "type": "panel",
             "version": ""
         }
     ],
@@ -65,12 +65,12 @@
                 "enable": true,
                 "hide": true,
                 "iconColor": "rgba(0, 211, 255, 1)",
-                "name": "Annotations \u0026 Alerts",
+                "name": "Annotations & Alerts",
                 "type": "dashboard"
             }
         ]
     },
-    "description": "Comprehensive monitoring dashboard for Proxmox VE using pve-exporter. Includes Node, VM, LXC, Storage, ZFS, and Backup metrics.",
+    "description": "Comprehensive monitoring dashboard for Proxmox VE using pve-exporter. Includes Node, VM, LXC, Storage, ZFS, and Hardware Sensor metrics.",
     "editable": true,
     "fiscalYearStartMonth": 0,
     "graphTooltip": 1,
@@ -149,7 +149,6 @@
                 },
                 "textMode": "auto"
             },
-            "pluginVersion": "10.0.0",
             "targets": [
                 {
                     "expr": "count(pve_node_up == 1)",
@@ -323,7 +322,6 @@
                 "showThresholdLabels": false,
                 "showThresholdMarkers": true
             },
-            "pluginVersion": "10.0.0",
             "targets": [
                 {
                     "expr": "avg(pve_node_cpu_load) * 100",
@@ -387,7 +385,6 @@
                 "showThresholdLabels": false,
                 "showThresholdMarkers": true
             },
-            "pluginVersion": "10.0.0",
             "targets": [
                 {
                     "expr": "sum(pve_node_memory_used_bytes) / sum(pve_node_memory_total_bytes) * 100",
@@ -848,8 +845,6 @@
                         }
                     },
                     "mappings": [],
-                    "max": 1,
-                    "min": 0,
                     "thresholds": {
                         "mode": "absolute",
                         "steps": [
@@ -897,7 +892,7 @@
                     "refId": "B"
                 }
             ],
-            "title": "I/O Wait \u0026 Idle",
+            "title": "CPU IOWait / Idle",
             "type": "timeseries"
         },
         {
@@ -908,7 +903,7 @@
                 "x": 0,
                 "y": 20
             },
-            "id": 102,
+            "id": 200,
             "panels": [
                 {
                     "datasource": {
@@ -948,8 +943,12 @@
                                 "mode": "absolute",
                                 "steps": [
                                     {
-                                        "color": "green",
+                                        "color": "red",
                                         "value": null
+                                    },
+                                    {
+                                        "color": "green",
+                                        "value": 1
                                     }
                                 ]
                             }
@@ -964,8 +963,13 @@
                                     {
                                         "id": "custom.cellOptions",
                                         "value": {
-                                            "type": "color-text"
+                                            "mode": "lcd",
+                                            "type": "gauge"
                                         }
+                                    },
+                                    {
+                                        "id": "max",
+                                        "value": 1
                                     }
                                 ]
                             },
@@ -978,6 +982,17 @@
                                     {
                                         "id": "unit",
                                         "value": "percentunit"
+                                    },
+                                    {
+                                        "id": "custom.cellOptions",
+                                        "value": {
+                                            "mode": "lcd",
+                                            "type": "gauge"
+                                        }
+                                    },
+                                    {
+                                        "id": "max",
+                                        "value": 1
                                     }
                                 ]
                             },
@@ -1008,12 +1023,12 @@
                         ]
                     },
                     "gridPos": {
-                        "h": 8,
+                        "h": 10,
                         "w": 24,
                         "x": 0,
                         "y": 21
                     },
-                    "id": 20,
+                    "id": 201,
                     "options": {
                         "cellHeight": "sm",
                         "footer": {
@@ -1025,7 +1040,12 @@
                             "show": false
                         },
                         "showHeader": true,
-                        "sortBy": []
+                        "sortBy": [
+                            {
+                                "desc": true,
+                                "displayName": "Status"
+                            }
+                        ]
                     },
                     "targets": [
                         {
@@ -1033,28 +1053,28 @@
                             "format": "table",
                             "instant": true,
                             "legendFormat": "",
-                            "refId": "A"
+                            "refId": "status"
                         },
                         {
                             "expr": "pve_vm_cpu_usage{node=~\"$node\"}",
                             "format": "table",
                             "instant": true,
                             "legendFormat": "",
-                            "refId": "B"
+                            "refId": "cpu"
                         },
                         {
                             "expr": "pve_vm_memory_used_bytes{node=~\"$node\"}",
                             "format": "table",
                             "instant": true,
                             "legendFormat": "",
-                            "refId": "C"
+                            "refId": "mem"
                         },
                         {
                             "expr": "pve_vm_uptime_seconds{node=~\"$node\"}",
                             "format": "table",
                             "instant": true,
                             "legendFormat": "",
-                            "refId": "D"
+                            "refId": "uptime"
                         }
                     ],
                     "title": "Virtual Machines",
@@ -1079,33 +1099,33 @@
                                     "__name__ 2": true,
                                     "__name__ 3": true,
                                     "__name__ 4": true,
-                                    "instance": true,
-                                    "instance 1": true,
-                                    "instance 2": true,
-                                    "instance 3": true,
-                                    "instance 4": true,
                                     "job": true,
                                     "job 1": true,
                                     "job 2": true,
                                     "job 3": true,
                                     "job 4": true,
-                                    "name 2": true,
-                                    "name 3": true,
-                                    "name 4": true,
+                                    "instance": true,
+                                    "instance 1": true,
+                                    "instance 2": true,
+                                    "instance 3": true,
+                                    "instance 4": true,
+                                    "node 1": true,
                                     "node 2": true,
                                     "node 3": true,
-                                    "node 4": true
+                                    "node 4": true,
+                                    "name 1": true,
+                                    "name 2": true,
+                                    "name 3": true,
+                                    "name 4": true
                                 },
                                 "indexByName": {},
                                 "renameByName": {
-                                    "Value #A": "Status",
-                                    "Value #B": "CPU",
-                                    "Value #C": "Memory",
-                                    "Value #D": "Uptime",
+                                    "Value #status": "Status",
+                                    "Value #cpu": "CPU",
+                                    "Value #mem": "Memory",
+                                    "Value #uptime": "Uptime",
                                     "name": "Name",
-                                    "name 1": "Name",
                                     "node": "Node",
-                                    "node 1": "Node",
                                     "vmid": "VMID"
                                 }
                             }
@@ -1130,181 +1150,7 @@
                                 "axisPlacement": "auto",
                                 "barAlignment": 0,
                                 "drawStyle": "line",
-                                "fillOpacity": 10,
-                                "gradientMode": "none",
-                                "hideFrom": {
-                                    "legend": false,
-                                    "tooltip": false,
-                                    "viz": false
-                                },
-                                "lineInterpolation": "smooth",
-                                "lineWidth": 2,
-                                "pointSize": 5,
-                                "scaleDistribution": {
-                                    "type": "linear"
-                                },
-                                "showPoints": "never",
-                                "spanNulls": false,
-                                "stacking": {
-                                    "group": "A",
-                                    "mode": "none"
-                                },
-                                "thresholdsStyle": {
-                                    "mode": "off"
-                                }
-                            },
-                            "mappings": [],
-                            "max": 1,
-                            "min": 0,
-                            "thresholds": {
-                                "mode": "absolute",
-                                "steps": [
-                                    {
-                                        "color": "green",
-                                        "value": null
-                                    }
-                                ]
-                            },
-                            "unit": "percentunit"
-                        },
-                        "overrides": []
-                    },
-                    "gridPos": {
-                        "h": 8,
-                        "w": 12,
-                        "x": 0,
-                        "y": 29
-                    },
-                    "id": 21,
-                    "options": {
-                        "legend": {
-                            "calcs": [
-                                "mean",
-                                "max"
-                            ],
-                            "displayMode": "table",
-                            "placement": "bottom",
-                            "showLegend": true
-                        },
-                        "tooltip": {
-                            "mode": "multi",
-                            "sort": "desc"
-                        }
-                    },
-                    "targets": [
-                        {
-                            "expr": "pve_vm_cpu_usage{node=~\"$node\", vmid=~\"$vm\"}",
-                            "legendFormat": "{{name}}",
-                            "refId": "A"
-                        }
-                    ],
-                    "title": "VM CPU Usage",
-                    "type": "timeseries"
-                },
-                {
-                    "datasource": {
-                        "type": "prometheus",
-                        "uid": "${datasource}"
-                    },
-                    "fieldConfig": {
-                        "defaults": {
-                            "color": {
-                                "mode": "palette-classic"
-                            },
-                            "custom": {
-                                "axisCenteredZero": false,
-                                "axisColorMode": "text",
-                                "axisLabel": "",
-                                "axisPlacement": "auto",
-                                "barAlignment": 0,
-                                "drawStyle": "line",
-                                "fillOpacity": 10,
-                                "gradientMode": "none",
-                                "hideFrom": {
-                                    "legend": false,
-                                    "tooltip": false,
-                                    "viz": false
-                                },
-                                "lineInterpolation": "smooth",
-                                "lineWidth": 2,
-                                "pointSize": 5,
-                                "scaleDistribution": {
-                                    "type": "linear"
-                                },
-                                "showPoints": "never",
-                                "spanNulls": false,
-                                "stacking": {
-                                    "group": "A",
-                                    "mode": "none"
-                                },
-                                "thresholdsStyle": {
-                                    "mode": "off"
-                                }
-                            },
-                            "mappings": [],
-                            "thresholds": {
-                                "mode": "absolute",
-                                "steps": [
-                                    {
-                                        "color": "green",
-                                        "value": null
-                                    }
-                                ]
-                            },
-                            "unit": "bytes"
-                        },
-                        "overrides": []
-                    },
-                    "gridPos": {
-                        "h": 8,
-                        "w": 12,
-                        "x": 12,
-                        "y": 29
-                    },
-                    "id": 22,
-                    "options": {
-                        "legend": {
-                            "calcs": [
-                                "mean",
-                                "max"
-                            ],
-                            "displayMode": "table",
-                            "placement": "bottom",
-                            "showLegend": true
-                        },
-                        "tooltip": {
-                            "mode": "multi",
-                            "sort": "desc"
-                        }
-                    },
-                    "targets": [
-                        {
-                            "expr": "pve_vm_memory_used_bytes{node=~\"$node\", vmid=~\"$vm\"}",
-                            "legendFormat": "{{name}}",
-                            "refId": "A"
-                        }
-                    ],
-                    "title": "VM Memory Usage",
-                    "type": "timeseries"
-                },
-                {
-                    "datasource": {
-                        "type": "prometheus",
-                        "uid": "${datasource}"
-                    },
-                    "fieldConfig": {
-                        "defaults": {
-                            "color": {
-                                "mode": "palette-classic"
-                            },
-                            "custom": {
-                                "axisCenteredZero": false,
-                                "axisColorMode": "text",
-                                "axisLabel": "",
-                                "axisPlacement": "auto",
-                                "barAlignment": 0,
-                                "drawStyle": "line",
-                                "fillOpacity": 10,
+                                "fillOpacity": 20,
                                 "gradientMode": "none",
                                 "hideFrom": {
                                     "legend": false,
@@ -1345,9 +1191,9 @@
                         "h": 8,
                         "w": 12,
                         "x": 0,
-                        "y": 37
+                        "y": 31
                     },
-                    "id": 23,
+                    "id": 202,
                     "options": {
                         "legend": {
                             "calcs": [
@@ -1365,12 +1211,12 @@
                     },
                     "targets": [
                         {
-                            "expr": "rate(pve_vm_network_in_bytes_total{node=~\"$node\", vmid=~\"$vm\"}[5m])",
+                            "expr": "rate(pve_vm_network_in_bytes_total{node=~\"$node\"}[5m])",
                             "legendFormat": "{{name}} In",
                             "refId": "A"
                         },
                         {
-                            "expr": "rate(pve_vm_network_out_bytes_total{node=~\"$node\", vmid=~\"$vm\"}[5m])",
+                            "expr": "rate(pve_vm_network_out_bytes_total{node=~\"$node\"}[5m])",
                             "legendFormat": "{{name}} Out",
                             "refId": "B"
                         }
@@ -1395,7 +1241,7 @@
                                 "axisPlacement": "auto",
                                 "barAlignment": 0,
                                 "drawStyle": "line",
-                                "fillOpacity": 10,
+                                "fillOpacity": 20,
                                 "gradientMode": "none",
                                 "hideFrom": {
                                     "legend": false,
@@ -1436,9 +1282,9 @@
                         "h": 8,
                         "w": 12,
                         "x": 12,
-                        "y": 37
+                        "y": 31
                     },
-                    "id": 24,
+                    "id": 203,
                     "options": {
                         "legend": {
                             "calcs": [
@@ -1456,12 +1302,12 @@
                     },
                     "targets": [
                         {
-                            "expr": "rate(pve_vm_disk_read_bytes_total{node=~\"$node\", vmid=~\"$vm\"}[5m])",
+                            "expr": "rate(pve_vm_disk_read_bytes_total{node=~\"$node\"}[5m])",
                             "legendFormat": "{{name}} Read",
                             "refId": "A"
                         },
                         {
-                            "expr": "rate(pve_vm_disk_write_bytes_total{node=~\"$node\", vmid=~\"$vm\"}[5m])",
+                            "expr": "rate(pve_vm_disk_write_bytes_total{node=~\"$node\"}[5m])",
                             "legendFormat": "{{name}} Write",
                             "refId": "B"
                         }
@@ -1470,7 +1316,7 @@
                     "type": "timeseries"
                 }
             ],
-            "title": "💻 Virtual Machines",
+            "title": "🖥️ Virtual Machines",
             "type": "row"
         },
         {
@@ -1481,7 +1327,7 @@
                 "x": 0,
                 "y": 21
             },
-            "id": 103,
+            "id": 210,
             "panels": [
                 {
                     "datasource": {
@@ -1521,8 +1367,12 @@
                                 "mode": "absolute",
                                 "steps": [
                                     {
-                                        "color": "green",
+                                        "color": "red",
                                         "value": null
+                                    },
+                                    {
+                                        "color": "green",
+                                        "value": 1
                                     }
                                 ]
                             }
@@ -1537,8 +1387,13 @@
                                     {
                                         "id": "custom.cellOptions",
                                         "value": {
-                                            "type": "color-text"
+                                            "mode": "lcd",
+                                            "type": "gauge"
                                         }
+                                    },
+                                    {
+                                        "id": "max",
+                                        "value": 1
                                     }
                                 ]
                             },
@@ -1551,6 +1406,17 @@
                                     {
                                         "id": "unit",
                                         "value": "percentunit"
+                                    },
+                                    {
+                                        "id": "custom.cellOptions",
+                                        "value": {
+                                            "mode": "lcd",
+                                            "type": "gauge"
+                                        }
+                                    },
+                                    {
+                                        "id": "max",
+                                        "value": 1
                                     }
                                 ]
                             },
@@ -1581,12 +1447,12 @@
                         ]
                     },
                     "gridPos": {
-                        "h": 8,
+                        "h": 10,
                         "w": 24,
                         "x": 0,
                         "y": 22
                     },
-                    "id": 30,
+                    "id": 211,
                     "options": {
                         "cellHeight": "sm",
                         "footer": {
@@ -1597,32 +1463,42 @@
                             ],
                             "show": false
                         },
-                        "showHeader": true
+                        "showHeader": true,
+                        "sortBy": [
+                            {
+                                "desc": true,
+                                "displayName": "Status"
+                            }
+                        ]
                     },
                     "targets": [
                         {
                             "expr": "pve_lxc_status{node=~\"$node\"}",
                             "format": "table",
                             "instant": true,
-                            "refId": "A"
+                            "legendFormat": "",
+                            "refId": "status"
                         },
                         {
                             "expr": "pve_lxc_cpu_usage{node=~\"$node\"}",
                             "format": "table",
                             "instant": true,
-                            "refId": "B"
+                            "legendFormat": "",
+                            "refId": "cpu"
                         },
                         {
                             "expr": "pve_lxc_memory_used_bytes{node=~\"$node\"}",
                             "format": "table",
                             "instant": true,
-                            "refId": "C"
+                            "legendFormat": "",
+                            "refId": "mem"
                         },
                         {
                             "expr": "pve_lxc_uptime_seconds{node=~\"$node\"}",
                             "format": "table",
                             "instant": true,
-                            "refId": "D"
+                            "legendFormat": "",
+                            "refId": "uptime"
                         }
                     ],
                     "title": "LXC Containers",
@@ -1647,32 +1523,33 @@
                                     "__name__ 2": true,
                                     "__name__ 3": true,
                                     "__name__ 4": true,
-                                    "instance": true,
-                                    "instance 1": true,
-                                    "instance 2": true,
-                                    "instance 3": true,
-                                    "instance 4": true,
                                     "job": true,
                                     "job 1": true,
                                     "job 2": true,
                                     "job 3": true,
                                     "job 4": true,
-                                    "name 2": true,
-                                    "name 3": true,
-                                    "name 4": true,
+                                    "instance": true,
+                                    "instance 1": true,
+                                    "instance 2": true,
+                                    "instance 3": true,
+                                    "instance 4": true,
+                                    "node 1": true,
                                     "node 2": true,
                                     "node 3": true,
-                                    "node 4": true
+                                    "node 4": true,
+                                    "name 1": true,
+                                    "name 2": true,
+                                    "name 3": true,
+                                    "name 4": true
                                 },
+                                "indexByName": {},
                                 "renameByName": {
-                                    "Value #A": "Status",
-                                    "Value #B": "CPU",
-                                    "Value #C": "Memory",
-                                    "Value #D": "Uptime",
+                                    "Value #status": "Status",
+                                    "Value #cpu": "CPU",
+                                    "Value #mem": "Memory",
+                                    "Value #uptime": "Uptime",
                                     "name": "Name",
-                                    "name 1": "Name",
                                     "node": "Node",
-                                    "node 1": "Node",
                                     "vmid": "VMID"
                                 }
                             }
@@ -1697,7 +1574,7 @@
                                 "axisPlacement": "auto",
                                 "barAlignment": 0,
                                 "drawStyle": "line",
-                                "fillOpacity": 10,
+                                "fillOpacity": 20,
                                 "gradientMode": "none",
                                 "hideFrom": {
                                     "legend": false,
@@ -1721,8 +1598,6 @@
                                 }
                             },
                             "mappings": [],
-                            "max": 1,
-                            "min": 0,
                             "thresholds": {
                                 "mode": "absolute",
                                 "steps": [
@@ -1732,7 +1607,7 @@
                                     }
                                 ]
                             },
-                            "unit": "percentunit"
+                            "unit": "Bps"
                         },
                         "overrides": []
                     },
@@ -1740,9 +1615,9 @@
                         "h": 8,
                         "w": 12,
                         "x": 0,
-                        "y": 30
+                        "y": 32
                     },
-                    "id": 31,
+                    "id": 212,
                     "options": {
                         "legend": {
                             "calcs": [
@@ -1760,12 +1635,17 @@
                     },
                     "targets": [
                         {
-                            "expr": "pve_lxc_cpu_usage{node=~\"$node\", vmid=~\"$lxc\"}",
-                            "legendFormat": "{{name}}",
+                            "expr": "rate(pve_lxc_network_in_bytes_total{node=~\"$node\"}[5m])",
+                            "legendFormat": "{{name}} In",
                             "refId": "A"
+                        },
+                        {
+                            "expr": "rate(pve_lxc_network_out_bytes_total{node=~\"$node\"}[5m])",
+                            "legendFormat": "{{name}} Out",
+                            "refId": "B"
                         }
                     ],
-                    "title": "LXC CPU Usage",
+                    "title": "LXC Network I/O",
                     "type": "timeseries"
                 },
                 {
@@ -1785,7 +1665,7 @@
                                 "axisPlacement": "auto",
                                 "barAlignment": 0,
                                 "drawStyle": "line",
-                                "fillOpacity": 10,
+                                "fillOpacity": 20,
                                 "gradientMode": "none",
                                 "hideFrom": {
                                     "legend": false,
@@ -1818,7 +1698,7 @@
                                     }
                                 ]
                             },
-                            "unit": "bytes"
+                            "unit": "Bps"
                         },
                         "overrides": []
                     },
@@ -1826,9 +1706,9 @@
                         "h": 8,
                         "w": 12,
                         "x": 12,
-                        "y": 30
+                        "y": 32
                     },
-                    "id": 32,
+                    "id": 213,
                     "options": {
                         "legend": {
                             "calcs": [
@@ -1846,12 +1726,17 @@
                     },
                     "targets": [
                         {
-                            "expr": "pve_lxc_memory_used_bytes{node=~\"$node\", vmid=~\"$lxc\"}",
-                            "legendFormat": "{{name}}",
+                            "expr": "rate(pve_lxc_disk_read_bytes_total{node=~\"$node\"}[5m])",
+                            "legendFormat": "{{name}} Read",
                             "refId": "A"
+                        },
+                        {
+                            "expr": "rate(pve_lxc_disk_write_bytes_total{node=~\"$node\"}[5m])",
+                            "legendFormat": "{{name}} Write",
+                            "refId": "B"
                         }
                     ],
-                    "title": "LXC Memory Usage",
+                    "title": "LXC Disk I/O",
                     "type": "timeseries"
                 }
             ],
@@ -1866,7 +1751,7 @@
                 "x": 0,
                 "y": 22
             },
-            "id": 104,
+            "id": 220,
             "panels": [
                 {
                     "datasource": {
@@ -1904,11 +1789,11 @@
                     },
                     "gridPos": {
                         "h": 8,
-                        "w": 12,
+                        "w": 24,
                         "x": 0,
                         "y": 23
                     },
-                    "id": 40,
+                    "id": 221,
                     "options": {
                         "displayMode": "lcd",
                         "minVizHeight": 10,
@@ -1927,166 +1812,12 @@
                     "targets": [
                         {
                             "expr": "pve_storage_used_fraction{node=~\"$node\"} * 100",
-                            "legendFormat": "{{storage}}",
+                            "legendFormat": "{{storage}} ({{type}})",
                             "refId": "A"
                         }
                     ],
                     "title": "Storage Usage",
                     "type": "bargauge"
-                },
-                {
-                    "datasource": {
-                        "type": "prometheus",
-                        "uid": "${datasource}"
-                    },
-                    "fieldConfig": {
-                        "defaults": {
-                            "color": {
-                                "mode": "thresholds"
-                            },
-                            "custom": {
-                                "align": "auto",
-                                "cellOptions": {
-                                    "type": "auto"
-                                },
-                                "inspect": false
-                            },
-                            "mappings": [],
-                            "thresholds": {
-                                "mode": "absolute",
-                                "steps": [
-                                    {
-                                        "color": "green",
-                                        "value": null
-                                    }
-                                ]
-                            }
-                        },
-                        "overrides": [
-                            {
-                                "matcher": {
-                                    "id": "byName",
-                                    "options": "Total"
-                                },
-                                "properties": [
-                                    {
-                                        "id": "unit",
-                                        "value": "bytes"
-                                    }
-                                ]
-                            },
-                            {
-                                "matcher": {
-                                    "id": "byName",
-                                    "options": "Used"
-                                },
-                                "properties": [
-                                    {
-                                        "id": "unit",
-                                        "value": "bytes"
-                                    }
-                                ]
-                            },
-                            {
-                                "matcher": {
-                                    "id": "byName",
-                                    "options": "Available"
-                                },
-                                "properties": [
-                                    {
-                                        "id": "unit",
-                                        "value": "bytes"
-                                    }
-                                ]
-                            }
-                        ]
-                    },
-                    "gridPos": {
-                        "h": 8,
-                        "w": 12,
-                        "x": 12,
-                        "y": 23
-                    },
-                    "id": 41,
-                    "options": {
-                        "cellHeight": "sm",
-                        "footer": {
-                            "countRows": false,
-                            "fields": "",
-                            "reducer": [
-                                "sum"
-                            ],
-                            "show": false
-                        },
-                        "showHeader": true
-                    },
-                    "targets": [
-                        {
-                            "expr": "pve_storage_total_bytes{node=~\"$node\"}",
-                            "format": "table",
-                            "instant": true,
-                            "refId": "A"
-                        },
-                        {
-                            "expr": "pve_storage_used_bytes{node=~\"$node\"}",
-                            "format": "table",
-                            "instant": true,
-                            "refId": "B"
-                        },
-                        {
-                            "expr": "pve_storage_available_bytes{node=~\"$node\"}",
-                            "format": "table",
-                            "instant": true,
-                            "refId": "C"
-                        }
-                    ],
-                    "title": "Storage Details",
-                    "transformations": [
-                        {
-                            "id": "seriesToColumns",
-                            "options": {
-                                "byField": "storage"
-                            }
-                        },
-                        {
-                            "id": "organize",
-                            "options": {
-                                "excludeByName": {
-                                    "Time": true,
-                                    "Time 1": true,
-                                    "Time 2": true,
-                                    "Time 3": true,
-                                    "__name__": true,
-                                    "__name__ 1": true,
-                                    "__name__ 2": true,
-                                    "__name__ 3": true,
-                                    "instance": true,
-                                    "instance 1": true,
-                                    "instance 2": true,
-                                    "instance 3": true,
-                                    "job": true,
-                                    "job 1": true,
-                                    "job 2": true,
-                                    "job 3": true,
-                                    "node 2": true,
-                                    "node 3": true,
-                                    "type 2": true,
-                                    "type 3": true
-                                },
-                                "renameByName": {
-                                    "Value #A": "Total",
-                                    "Value #B": "Used",
-                                    "Value #C": "Available",
-                                    "node": "Node",
-                                    "node 1": "Node",
-                                    "storage": "Storage",
-                                    "type": "Type",
-                                    "type 1": "Type"
-                                }
-                            }
-                        }
-                    ],
-                    "type": "table"
                 }
             ],
             "title": "💾 Storage",
@@ -2100,7 +1831,7 @@
                 "x": 0,
                 "y": 23
             },
-            "id": 105,
+            "id": 230,
             "panels": [
                 {
                     "datasource": {
@@ -2147,16 +1878,16 @@
                     },
                     "gridPos": {
                         "h": 4,
-                        "w": 8,
+                        "w": 24,
                         "x": 0,
                         "y": 24
                     },
-                    "id": 50,
+                    "id": 231,
                     "options": {
                         "colorMode": "background",
                         "graphMode": "none",
-                        "justifyMode": "auto",
-                        "orientation": "auto",
+                        "justifyMode": "center",
+                        "orientation": "horizontal",
                         "reduceOptions": {
                             "calcs": [
                                 "lastNotNull"
@@ -2164,11 +1895,11 @@
                             "fields": "",
                             "values": false
                         },
-                        "textMode": "auto"
+                        "textMode": "value_and_name"
                     },
                     "targets": [
                         {
-                            "expr": "pve_zfs_pool_health_status{node=~\"$node\"}",
+                            "expr": "pve_zfs_pool_health_status{node=~\"$node.*\"}",
                             "legendFormat": "{{pool}}",
                             "refId": "A"
                         }
@@ -2198,11 +1929,11 @@
                                     },
                                     {
                                         "color": "yellow",
-                                        "value": 50
+                                        "value": 30
                                     },
                                     {
                                         "color": "red",
-                                        "value": 75
+                                        "value": 60
                                     }
                                 ]
                             },
@@ -2211,14 +1942,17 @@
                         "overrides": []
                     },
                     "gridPos": {
-                        "h": 4,
-                        "w": 8,
-                        "x": 8,
-                        "y": 24
+                        "h": 6,
+                        "w": 12,
+                        "x": 0,
+                        "y": 28
                     },
-                    "id": 51,
+                    "id": 232,
                     "options": {
-                        "orientation": "auto",
+                        "displayMode": "lcd",
+                        "minVizHeight": 10,
+                        "minVizWidth": 0,
+                        "orientation": "horizontal",
                         "reduceOptions": {
                             "calcs": [
                                 "lastNotNull"
@@ -2226,81 +1960,18 @@
                             "fields": "",
                             "values": false
                         },
-                        "showThresholdLabels": false,
-                        "showThresholdMarkers": true
+                        "showUnfilled": true,
+                        "valueMode": "color"
                     },
                     "targets": [
                         {
-                            "expr": "pve_zfs_pool_frag_percent{node=~\"$node\"}",
+                            "expr": "pve_zfs_pool_frag_percent{node=~\"$node.*\"}",
                             "legendFormat": "{{pool}}",
                             "refId": "A"
                         }
                     ],
-                    "title": "ZFS Fragmentation",
-                    "type": "gauge"
-                },
-                {
-                    "datasource": {
-                        "type": "prometheus",
-                        "uid": "${datasource}"
-                    },
-                    "fieldConfig": {
-                        "defaults": {
-                            "color": {
-                                "mode": "thresholds"
-                            },
-                            "mappings": [],
-                            "max": 1,
-                            "min": 0,
-                            "thresholds": {
-                                "mode": "absolute",
-                                "steps": [
-                                    {
-                                        "color": "red",
-                                        "value": null
-                                    },
-                                    {
-                                        "color": "yellow",
-                                        "value": 0.8
-                                    },
-                                    {
-                                        "color": "green",
-                                        "value": 0.95
-                                    }
-                                ]
-                            },
-                            "unit": "percent"
-                        },
-                        "overrides": []
-                    },
-                    "gridPos": {
-                        "h": 4,
-                        "w": 8,
-                        "x": 16,
-                        "y": 24
-                    },
-                    "id": 52,
-                    "options": {
-                        "orientation": "auto",
-                        "reduceOptions": {
-                            "calcs": [
-                                "lastNotNull"
-                            ],
-                            "fields": "",
-                            "values": false
-                        },
-                        "showThresholdLabels": false,
-                        "showThresholdMarkers": true
-                    },
-                    "targets": [
-                        {
-                            "expr": "pve_zfs_arc_hit_ratio_percent{node=~\"$node\"}",
-                            "legendFormat": "{{node}}",
-                            "refId": "A"
-                        }
-                    ],
-                    "title": "ZFS ARC Hit Ratio %",
-                    "type": "gauge"
+                    "title": "ZFS Pool Fragmentation",
+                    "type": "bargauge"
                 },
                 {
                     "datasource": {
@@ -2357,12 +2028,12 @@
                         "overrides": []
                     },
                     "gridPos": {
-                        "h": 8,
+                        "h": 6,
                         "w": 12,
-                        "x": 0,
+                        "x": 12,
                         "y": 28
                     },
-                    "id": 53,
+                    "id": 233,
                     "options": {
                         "legend": {
                             "calcs": [
@@ -2380,19 +2051,9 @@
                     },
                     "targets": [
                         {
-                            "expr": "pve_zfs_arc_size_bytes{node=~\"$node\"}",
-                            "legendFormat": "{{node}} Current",
+                            "expr": "pve_zfs_arc_size_bytes{node=~\"$node.*\"}",
+                            "legendFormat": "{{node}} ARC",
                             "refId": "A"
-                        },
-                        {
-                            "expr": "pve_zfs_arc_max_size_bytes{node=~\"$node\"}",
-                            "legendFormat": "{{node}} Max",
-                            "refId": "B"
-                        },
-                        {
-                            "expr": "pve_zfs_arc_target_size_bytes{node=~\"$node\"}",
-                            "legendFormat": "{{node}} Target",
-                            "refId": "C"
                         }
                     ],
                     "title": "ZFS ARC Size",
@@ -2406,88 +2067,60 @@
                     "fieldConfig": {
                         "defaults": {
                             "color": {
-                                "mode": "palette-classic"
-                            },
-                            "custom": {
-                                "axisCenteredZero": false,
-                                "axisColorMode": "text",
-                                "axisLabel": "",
-                                "axisPlacement": "auto",
-                                "barAlignment": 0,
-                                "drawStyle": "line",
-                                "fillOpacity": 20,
-                                "gradientMode": "none",
-                                "hideFrom": {
-                                    "legend": false,
-                                    "tooltip": false,
-                                    "viz": false
-                                },
-                                "lineInterpolation": "smooth",
-                                "lineWidth": 2,
-                                "pointSize": 5,
-                                "scaleDistribution": {
-                                    "type": "linear"
-                                },
-                                "showPoints": "never",
-                                "spanNulls": false,
-                                "stacking": {
-                                    "group": "A",
-                                    "mode": "none"
-                                },
-                                "thresholdsStyle": {
-                                    "mode": "off"
-                                }
+                                "mode": "thresholds"
                             },
                             "mappings": [],
+                            "max": 100,
+                            "min": 0,
                             "thresholds": {
                                 "mode": "absolute",
                                 "steps": [
                                     {
-                                        "color": "green",
+                                        "color": "red",
                                         "value": null
+                                    },
+                                    {
+                                        "color": "yellow",
+                                        "value": 80
+                                    },
+                                    {
+                                        "color": "green",
+                                        "value": 95
                                     }
                                 ]
                             },
-                            "unit": "bytes"
+                            "unit": "percent"
                         },
                         "overrides": []
                     },
                     "gridPos": {
-                        "h": 8,
-                        "w": 12,
-                        "x": 12,
-                        "y": 28
+                        "h": 4,
+                        "w": 24,
+                        "x": 0,
+                        "y": 34
                     },
-                    "id": 54,
+                    "id": 234,
                     "options": {
-                        "legend": {
+                        "orientation": "auto",
+                        "reduceOptions": {
                             "calcs": [
-                                "mean",
-                                "max"
+                                "lastNotNull"
                             ],
-                            "displayMode": "table",
-                            "placement": "bottom",
-                            "showLegend": true
+                            "fields": "",
+                            "values": false
                         },
-                        "tooltip": {
-                            "mode": "multi",
-                            "sort": "desc"
-                        }
+                        "showThresholdLabels": false,
+                        "showThresholdMarkers": true
                     },
                     "targets": [
                         {
-                            "expr": "pve_zfs_pool_alloc_bytes{node=~\"$node\"}",
-                            "legendFormat": "{{pool}} Allocated",
+                            "expr": "pve_zfs_arc_hit_ratio_percent{node=~\"$node.*\"}",
+                            "legendFormat": "{{node}}",
                             "refId": "A"
-                        },
-                        {
-                            "expr": "pve_zfs_pool_free_bytes{node=~\"$node\"}",
-                            "legendFormat": "{{pool}} Free",
-                            "refId": "B"
                         }
                     ],
-                    "title": "ZFS Pool Usage",
-                    "type": "timeseries"
+                    "title": "ZFS ARC Hit Ratio",
+                    "type": "gauge"
                 }
             ],
             "title": "🗄️ ZFS",
@@ -2499,9 +2132,9 @@
                 "h": 1,
                 "w": 24,
                 "x": 0,
-                "y": 50
+                "y": 24
             },
-            "id": 200,
+            "id": 240,
             "panels": [
                 {
                     "datasource": {
@@ -2527,7 +2160,7 @@
                                     "tooltip": false,
                                     "viz": false
                                 },
-                                "lineInterpolation": "smooth",
+                                "lineInterpolation": "linear",
                                 "lineWidth": 2,
                                 "pointSize": 5,
                                 "scaleDistribution": {
@@ -2540,7 +2173,7 @@
                                     "mode": "none"
                                 },
                                 "thresholdsStyle": {
-                                    "mode": "line"
+                                    "mode": "off"
                                 }
                             },
                             "mappings": [],
@@ -2553,11 +2186,11 @@
                                     },
                                     {
                                         "color": "yellow",
-                                        "value": 60
+                                        "value": 50
                                     },
                                     {
                                         "color": "red",
-                                        "value": 80
+                                        "value": 70
                                     }
                                 ]
                             },
@@ -2569,9 +2202,9 @@
                         "h": 8,
                         "w": 12,
                         "x": 0,
-                        "y": 51
+                        "y": 25
                     },
-                    "id": 201,
+                    "id": 241,
                     "options": {
                         "legend": {
                             "calcs": [
@@ -2579,7 +2212,7 @@
                                 "max"
                             ],
                             "displayMode": "table",
-                            "placement": "right",
+                            "placement": "bottom",
                             "showLegend": true
                         },
                         "tooltip": {
@@ -2621,7 +2254,7 @@
                                     "tooltip": false,
                                     "viz": false
                                 },
-                                "lineInterpolation": "smooth",
+                                "lineInterpolation": "linear",
                                 "lineWidth": 2,
                                 "pointSize": 5,
                                 "scaleDistribution": {
@@ -2655,18 +2288,17 @@
                         "h": 8,
                         "w": 12,
                         "x": 12,
-                        "y": 51
+                        "y": 25
                     },
-                    "id": 202,
+                    "id": 242,
                     "options": {
                         "legend": {
                             "calcs": [
                                 "mean",
-                                "min",
                                 "max"
                             ],
                             "displayMode": "table",
-                            "placement": "right",
+                            "placement": "bottom",
                             "showLegend": true
                         },
                         "tooltip": {
@@ -2677,7 +2309,7 @@
                     "targets": [
                         {
                             "expr": "pve_sensor_fan_rpm{node=~\"$node.*\"}",
-                            "legendFormat": "{{sensor}}",
+                            "legendFormat": "{{sensor}} ({{chip}})",
                             "refId": "A"
                         }
                     ],
@@ -2708,7 +2340,7 @@
                                     "tooltip": false,
                                     "viz": false
                                 },
-                                "lineInterpolation": "smooth",
+                                "lineInterpolation": "linear",
                                 "lineWidth": 2,
                                 "pointSize": 5,
                                 "scaleDistribution": {
@@ -2742,9 +2374,9 @@
                         "h": 8,
                         "w": 12,
                         "x": 0,
-                        "y": 59
+                        "y": 33
                     },
-                    "id": 203,
+                    "id": 243,
                     "options": {
                         "legend": {
                             "calcs": [
@@ -2752,7 +2384,7 @@
                                 "max"
                             ],
                             "displayMode": "table",
-                            "placement": "right",
+                            "placement": "bottom",
                             "showLegend": true
                         },
                         "tooltip": {
@@ -2794,7 +2426,7 @@
                                     "tooltip": false,
                                     "viz": false
                                 },
-                                "lineInterpolation": "smooth",
+                                "lineInterpolation": "linear",
                                 "lineWidth": 2,
                                 "pointSize": 5,
                                 "scaleDistribution": {
@@ -2828,16 +2460,17 @@
                         "h": 8,
                         "w": 12,
                         "x": 12,
-                        "y": 59
+                        "y": 33
                     },
-                    "id": 204,
+                    "id": 244,
                     "options": {
                         "legend": {
                             "calcs": [
-                                "mean"
+                                "mean",
+                                "max"
                             ],
                             "displayMode": "table",
-                            "placement": "right",
+                            "placement": "bottom",
                             "showLegend": true
                         },
                         "tooltip": {
@@ -2865,9 +2498,9 @@
                 "h": 1,
                 "w": 24,
                 "x": 0,
-                "y": 51
+                "y": 25
             },
-            "id": 300,
+            "id": 250,
             "panels": [
                 {
                     "datasource": {
@@ -2913,12 +2546,12 @@
                         "overrides": []
                     },
                     "gridPos": {
-                        "h": 6,
+                        "h": 5,
                         "w": 24,
                         "x": 0,
-                        "y": 52
+                        "y": 26
                     },
-                    "id": 301,
+                    "id": 251,
                     "options": {
                         "colorMode": "background",
                         "graphMode": "none",
@@ -2967,7 +2600,7 @@
                                     "tooltip": false,
                                     "viz": false
                                 },
-                                "lineInterpolation": "smooth",
+                                "lineInterpolation": "linear",
                                 "lineWidth": 2,
                                 "pointSize": 5,
                                 "scaleDistribution": {
@@ -2980,7 +2613,7 @@
                                     "mode": "none"
                                 },
                                 "thresholdsStyle": {
-                                    "mode": "line"
+                                    "mode": "off"
                                 }
                             },
                             "mappings": [],
@@ -2993,11 +2626,11 @@
                                     },
                                     {
                                         "color": "yellow",
-                                        "value": 45
+                                        "value": 50
                                     },
                                     {
                                         "color": "red",
-                                        "value": 55
+                                        "value": 60
                                     }
                                 ]
                             },
@@ -3009,9 +2642,9 @@
                         "h": 8,
                         "w": 12,
                         "x": 0,
-                        "y": 58
+                        "y": 31
                     },
-                    "id": 302,
+                    "id": 252,
                     "options": {
                         "legend": {
                             "calcs": [
@@ -3019,7 +2652,7 @@
                                 "max"
                             ],
                             "displayMode": "table",
-                            "placement": "right",
+                            "placement": "bottom",
                             "showLegend": true
                         },
                         "tooltip": {
@@ -3048,61 +2681,6 @@
                                 "mode": "thresholds"
                             },
                             "mappings": [],
-                            "thresholds": {
-                                "mode": "absolute",
-                                "steps": [
-                                    {
-                                        "color": "green",
-                                        "value": null
-                                    }
-                                ]
-                            },
-                            "unit": "h"
-                        },
-                        "overrides": []
-                    },
-                    "gridPos": {
-                        "h": 8,
-                        "w": 12,
-                        "x": 12,
-                        "y": 58
-                    },
-                    "id": 303,
-                    "options": {
-                        "colorMode": "value",
-                        "graphMode": "none",
-                        "justifyMode": "auto",
-                        "orientation": "horizontal",
-                        "reduceOptions": {
-                            "calcs": [
-                                "lastNotNull"
-                            ],
-                            "fields": "",
-                            "values": false
-                        },
-                        "textMode": "value_and_name"
-                    },
-                    "targets": [
-                        {
-                            "expr": "pve_disk_power_on_hours{node=~\"$node.*\"}",
-                            "legendFormat": "{{device}} ({{model}})",
-                            "refId": "A"
-                        }
-                    ],
-                    "title": "Power-On Hours",
-                    "type": "stat"
-                },
-                {
-                    "datasource": {
-                        "type": "prometheus",
-                        "uid": "${datasource}"
-                    },
-                    "fieldConfig": {
-                        "defaults": {
-                            "color": {
-                                "mode": "thresholds"
-                            },
-                            "mappings": [],
                             "max": 100,
                             "min": 0,
                             "thresholds": {
@@ -3114,11 +2692,11 @@
                                     },
                                     {
                                         "color": "yellow",
-                                        "value": 70
+                                        "value": 50
                                     },
                                     {
                                         "color": "red",
-                                        "value": 90
+                                        "value": 80
                                     }
                                 ]
                             },
@@ -3127,12 +2705,12 @@
                         "overrides": []
                     },
                     "gridPos": {
-                        "h": 6,
+                        "h": 8,
                         "w": 12,
-                        "x": 0,
-                        "y": 66
+                        "x": 12,
+                        "y": 31
                     },
-                    "id": 304,
+                    "id": 253,
                     "options": {
                         "displayMode": "lcd",
                         "minVizHeight": 10,
@@ -3173,7 +2751,62 @@
                                 "mode": "absolute",
                                 "steps": [
                                     {
-                                        "color": "green",
+                                        "color": "blue",
+                                        "value": null
+                                    }
+                                ]
+                            },
+                            "unit": "h"
+                        },
+                        "overrides": []
+                    },
+                    "gridPos": {
+                        "h": 5,
+                        "w": 12,
+                        "x": 0,
+                        "y": 39
+                    },
+                    "id": 254,
+                    "options": {
+                        "colorMode": "value",
+                        "graphMode": "none",
+                        "justifyMode": "auto",
+                        "orientation": "auto",
+                        "reduceOptions": {
+                            "calcs": [
+                                "lastNotNull"
+                            ],
+                            "fields": "",
+                            "values": false
+                        },
+                        "textMode": "value_and_name"
+                    },
+                    "targets": [
+                        {
+                            "expr": "pve_disk_power_on_hours{node=~\"$node.*\"}",
+                            "legendFormat": "{{device}} ({{model}})",
+                            "refId": "A"
+                        }
+                    ],
+                    "title": "Power-On Hours",
+                    "type": "stat"
+                },
+                {
+                    "datasource": {
+                        "type": "prometheus",
+                        "uid": "${datasource}"
+                    },
+                    "fieldConfig": {
+                        "defaults": {
+                            "color": {
+                                "mode": "thresholds"
+                            },
+                            "mappings": [],
+                            "thresholds": {
+                                "mode": "absolute",
+                                "steps": [
+                                    {
+                                        "color": "blue",
                                         "value": null
                                     }
                                 ]
@@ -3183,17 +2816,17 @@
                         "overrides": []
                     },
                     "gridPos": {
-                        "h": 6,
+                        "h": 5,
                         "w": 12,
                         "x": 12,
-                        "y": 66
+                        "y": 39
                     },
-                    "id": 305,
+                    "id": 255,
                     "options": {
                         "colorMode": "value",
-                        "graphMode": "area",
+                        "graphMode": "none",
                         "justifyMode": "auto",
-                        "orientation": "horizontal",
+                        "orientation": "auto",
                         "reduceOptions": {
                             "calcs": [
                                 "lastNotNull"
@@ -3275,62 +2908,6 @@
                 "skipUrlSync": false,
                 "sort": 1,
                 "type": "query"
-            },
-            {
-                "allValue": ".*",
-                "current": {
-                    "selected": true,
-                    "text": "All",
-                    "value": "$__all"
-                },
-                "datasource": {
-                    "type": "prometheus",
-                    "uid": "${datasource}"
-                },
-                "definition": "label_values(pve_vm_status{node=~\"$node\"}, vmid)",
-                "hide": 0,
-                "includeAll": true,
-                "label": "VM",
-                "multi": true,
-                "name": "vm",
-                "options": [],
-                "query": {
-                    "query": "label_values(pve_vm_status{node=~\"$node\"}, vmid)",
-                    "refId": "PrometheusVariableQueryEditor-VariableQuery"
-                },
-                "refresh": 1,
-                "regex": "",
-                "skipUrlSync": false,
-                "sort": 3,
-                "type": "query"
-            },
-            {
-                "allValue": ".*",
-                "current": {
-                    "selected": true,
-                    "text": "All",
-                    "value": "$__all"
-                },
-                "datasource": {
-                    "type": "prometheus",
-                    "uid": "${datasource}"
-                },
-                "definition": "label_values(pve_lxc_status{node=~\"$node\"}, vmid)",
-                "hide": 0,
-                "includeAll": true,
-                "label": "LXC",
-                "multi": true,
-                "name": "lxc",
-                "options": [],
-                "query": {
-                    "query": "label_values(pve_lxc_status{node=~\"$node\"}, vmid)",
-                    "refId": "PrometheusVariableQueryEditor-VariableQuery"
-                },
-                "refresh": 1,
-                "regex": "",
-                "skipUrlSync": false,
-                "sort": 3,
-                "type": "query"
             }
         ]
     },
@@ -3340,7 +2917,7 @@
     },
     "timepicker": {},
     "timezone": "",
-    "title": "Proxmox VE - PVE Exporter",
+    "title": "Proxmox VE - pve-exporter",
     "uid": "pve-exporter",
     "version": 1,
     "weekStart": ""

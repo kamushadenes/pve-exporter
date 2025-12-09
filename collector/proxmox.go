@@ -151,7 +151,7 @@ type ProxmoxCollector struct {
 	sensorVoltage     *prometheus.Desc
 	sensorPower       *prometheus.Desc
 
-	// Disk SMART metrics
+	// Disk SMART metrics (read from /var/lib/pve-exporter/smart.json)
 	diskTemperature    *prometheus.Desc
 	diskPowerOnHours   *prometheus.Desc
 	diskHealth         *prometheus.Desc
@@ -748,7 +748,7 @@ func NewProxmoxCollector(cfg *config.ProxmoxConfig) *ProxmoxCollector {
 			[]string{"node", "chip", "adapter", "sensor"}, nil,
 		),
 
-		// Disk SMART metrics
+		// Disk SMART metrics (read from /var/lib/pve-exporter/smart.json)
 		diskTemperature: prometheus.NewDesc(
 			"pve_disk_temperature_celsius",
 			"Disk temperature in Celsius",

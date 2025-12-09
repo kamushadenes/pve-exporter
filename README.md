@@ -14,7 +14,7 @@ A professional Prometheus exporter for Proxmox VE, written in Go. It collects co
   - **Storage**: Usage, Availability, Total size.
   - **ZFS**: Pool health, fragmentation, ARC statistics.
   - **Hardware Sensors**: Temperatures, fan speeds, voltages, power (via lm-sensors).
-  - **Disk SMART**: Temperature, TBW, power-on hours, health status.
+  - **Disk SMART**: Temperature, TBW, power-on hours, health status (optional, see setup below).
 - **Secure**: Supports API Token authentication (recommended) and standard password auth.
 - **Lightweight**: Single static binary, runs as systemd service.
 - **Easy Configuration**: Configure via environment variables or YAML file.
@@ -59,25 +59,9 @@ For production use, install the exporter as a systemd service running under a de
 
 ```bash
 sudo useradd --system --no-create-home --shell /usr/sbin/nologin pve-exporter
-### 2. Configure permissions for disk metrics
-    
-To collect SMART metrics without running the exporter as root, grant `cap_sys_rawio` capability to `smartctl`. 
-
-The recommended way is to use a systemd override to apply this automatically on service start (survives updates):
-
-```bash
-sudo mkdir -p /etc/systemd/system/pve-exporter.service.d
-sudo cat > /etc/systemd/system/pve-exporter.service.d/override.conf << 'EOF'
-[Service]
-# Grant smartctl capabilities automatically on startup
-ExecStartPre=+/usr/sbin/setcap cap_sys_rawio+ep /usr/sbin/smartctl
-EOF
-sudo systemctl daemon-reload
-sudo systemctl restart pve-exporter
 ```
 
-
-### 3. Install binary
+### 2. Install binary
 
 ```bash
 sudo wget -O /usr/local/bin/pve-exporter \
@@ -85,7 +69,7 @@ sudo wget -O /usr/local/bin/pve-exporter \
 sudo chmod +x /usr/local/bin/pve-exporter
 ```
 
-### 4. Create configuration
+### 3. Create configuration
 
 ```bash
 sudo mkdir -p /etc/pve-exporter
@@ -116,7 +100,7 @@ sudo chmod 640 /etc/pve-exporter/config.yml
 
 > **Note:** The `token_id` format is `user@realm!tokenname` - the exclamation mark is Proxmox syntax, not an error.
 
-### 5. Create systemd service
+### 4. Create systemd service
 
 ```bash
 sudo cat > /etc/systemd/system/pve-exporter.service << 'EOF'
@@ -134,7 +118,7 @@ ExecStart=/usr/local/bin/pve-exporter -config /etc/pve-exporter/config.yml
 Restart=on-failure
 RestartSec=5
 
-# Security hardening (some options disabled for disk SMART metrics via sudo)
+# Security hardening
 ProtectSystem=strict
 ProtectHome=yes
 PrivateTmp=yes
@@ -149,7 +133,7 @@ WantedBy=multi-user.target
 EOF
 ```
 
-### 6. Start and enable service
+### 5. Start and enable service
 
 ```bash
 sudo systemctl daemon-reload
@@ -354,12 +338,12 @@ The exporter exposes the following metrics at `/metrics`.
 | `pve_sensor_voltage_volts` | Voltage reading in Volts |
 | `pve_sensor_power_watts` | Power consumption in Watts |
 
-### Disk SMART Metrics
+### Disk SMART Metrics (Optional)
 
-**Note:** These metrics are collected from the local host using `smartctl`. Labels: `node`, `device`, `model`, `serial`, `type`.
+**Note:** These metrics require additional setup (see below). They are collected from `/var/lib/pve-exporter/smart.json` which is populated by a separate cron job running as root. Labels: `node`, `device`, `model`, `serial`, `type`.
 
 | Metric | Description |
-|--------|-------------|
+|--------|-----------|
 | `pve_disk_temperature_celsius` | Disk temperature in Celsius |
 | `pve_disk_power_on_hours` | Power on hours |
 | `pve_disk_health_status` | Health status (1=healthy, 0=failing) |
@@ -367,7 +351,42 @@ The exporter exposes the following metrics at `/metrics`.
 | `pve_disk_available_spare_percent` | NVMe available spare % |
 | `pve_disk_percentage_used` | NVMe percentage of life used |
 
+#### Disk SMART Setup
 
+Disk SMART metrics require running `smartctl` as root. To avoid running the entire exporter as root, a separate collector script runs via cron and writes data to a JSON file that the exporter reads.
+
+**1. Install the collector script:**
+
+```bash
+# Download the collector script
+sudo wget -O /usr/local/bin/pve-smart-collector.sh \
+  https://raw.githubusercontent.com/bigtcze/pve-exporter/main/scripts/pve-smart-collector.sh
+sudo chmod +x /usr/local/bin/pve-smart-collector.sh
+
+# Create data directory
+sudo mkdir -p /var/lib/pve-exporter
+```
+
+**2. Add cron job (runs every minute as root):**
+
+```bash
+echo '* * * * * root /usr/local/bin/pve-smart-collector.sh' | sudo tee /etc/cron.d/pve-smart-collector
+```
+
+**3. Verify it works:**
+
+```bash
+# Run manually first
+sudo /usr/local/bin/pve-smart-collector.sh
+
+# Check the output
+cat /var/lib/pve-exporter/smart.json
+
+# Verify metrics appear
+curl -s http://localhost:9221/metrics | grep pve_disk
+```
+
+> **Note:** If the JSON file doesn't exist or is older than 5 minutes, the exporter simply skips disk metrics without errors.
 ## 🔒 Authentication & Permissions
 
 For security best practices, create a dedicated monitoring user with **read-only** permissions.
