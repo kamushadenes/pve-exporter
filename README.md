@@ -14,7 +14,7 @@ A professional Prometheus exporter for Proxmox VE, written in Go. It collects co
   - **Storage**: Usage, Availability, Total size.
   - **ZFS**: Pool health, fragmentation, ARC statistics.
   - **Hardware Sensors**: Temperatures, fan speeds, voltages, power (via lm-sensors).
-  - **Disk SMART**: Temperature, TBW, power-on hours, health status (optional, see setup below).
+  - **Disk Metrics**: I/O throughput (automatic), SMART health, temperature, TBW (optional setup).
 - **Secure**: Supports API Token authentication (recommended) and standard password auth.
 - **Lightweight**: Single static binary, runs as systemd service.
 - **Easy Configuration**: Configure via environment variables or YAML file.
@@ -338,55 +338,51 @@ The exporter exposes the following metrics at `/metrics`.
 | `pve_sensor_voltage_volts` | Voltage reading in Volts |
 | `pve_sensor_power_watts` | Power consumption in Watts |
 
-### Disk SMART Metrics (Optional)
+### Disk Metrics
 
-**Note:** These metrics require additional setup (see below). They are collected from `/var/lib/pve-exporter/smart.json` which is populated by a separate cron job running as root. Labels: `node`, `device`, `model`, `serial`, `type`.
+#### Disk I/O (Automatic - No Setup Required)
+
+These metrics are collected automatically from `/proc/diskstats` without requiring root. Labels: `node`, `device`.
 
 | Metric | Description |
 |--------|-----------|
-| `pve_disk_temperature_celsius` | Disk temperature in Celsius |
+| `pve_disk_read_bytes_total` | Total bytes read from disk |
+| `pve_disk_write_bytes_total` | Total bytes written to disk |
+| `pve_disk_reads_completed_total` | Total read operations |
+| `pve_disk_writes_completed_total` | Total write operations |
+| `pve_disk_io_time_seconds_total` | Time spent doing I/O |
+
+#### Disk SMART (Optional Setup)
+
+SMART metrics require additional setup - a separate script runs via cron as root. Labels: `node`, `device`, `model`, `serial`, `type`.
+
+| Metric | Description |
+|--------|-----------|
+| `pve_disk_temperature_celsius` | Disk temperature |
 | `pve_disk_power_on_hours` | Power on hours |
-| `pve_disk_health_status` | Health status (1=healthy, 0=failing) |
-| `pve_disk_data_written_bytes` | Total data written (NVMe TBW) |
+| `pve_disk_health_status` | Health (1=healthy, 0=failing) |
+| `pve_disk_data_written_bytes` | NVMe TBW |
 | `pve_disk_available_spare_percent` | NVMe available spare % |
-| `pve_disk_percentage_used` | NVMe percentage of life used |
+| `pve_disk_percentage_used` | NVMe life used % |
 
-#### Disk SMART Setup
-
-Disk SMART metrics require running `smartctl` as root. To avoid running the entire exporter as root, a separate collector script runs via cron and writes data to a JSON file that the exporter reads.
-
-**1. Install the collector script:**
+**SMART Setup:**
 
 ```bash
-# Download the collector script
+# 1. Install collector script
 sudo wget -O /usr/local/bin/pve-smart-collector.sh \
   https://raw.githubusercontent.com/bigtcze/pve-exporter/main/scripts/pve-smart-collector.sh
 sudo chmod +x /usr/local/bin/pve-smart-collector.sh
-
-# Create data directory
 sudo mkdir -p /var/lib/pve-exporter
-```
 
-**2. Add cron job (runs every minute as root):**
-
-```bash
+# 2. Add cron job
 echo '* * * * * root /usr/local/bin/pve-smart-collector.sh' | sudo tee /etc/cron.d/pve-smart-collector
-```
 
-**3. Verify it works:**
-
-```bash
-# Run manually first
+# 3. Verify
 sudo /usr/local/bin/pve-smart-collector.sh
-
-# Check the output
-cat /var/lib/pve-exporter/smart.json
-
-# Verify metrics appear
 curl -s http://localhost:9221/metrics | grep pve_disk
 ```
 
-> **Note:** If the JSON file doesn't exist or is older than 5 minutes, the exporter simply skips disk metrics without errors.
+> **Note:** If SMART data file is missing or stale, those metrics are silently skipped.
 ## 🔒 Authentication & Permissions
 
 For security best practices, create a dedicated monitoring user with **read-only** permissions.

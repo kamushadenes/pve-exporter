@@ -158,6 +158,13 @@ type ProxmoxCollector struct {
 	diskDataWritten    *prometheus.Desc
 	diskAvailableSpare *prometheus.Desc
 	diskPercentageUsed *prometheus.Desc
+
+	// Disk I/O metrics (read from /proc/diskstats, no root needed)
+	diskReadBytes       *prometheus.Desc
+	diskWriteBytes      *prometheus.Desc
+	diskReadsCompleted  *prometheus.Desc
+	diskWritesCompleted *prometheus.Desc
+	diskIOTime          *prometheus.Desc
 }
 
 // NewProxmoxCollector creates a new Proxmox collector
@@ -779,6 +786,33 @@ func NewProxmoxCollector(cfg *config.ProxmoxConfig) *ProxmoxCollector {
 			"NVMe percentage of life used",
 			[]string{"node", "device", "model", "serial", "type"}, nil,
 		),
+
+		// Disk I/O metrics (from /proc/diskstats)
+		diskReadBytes: prometheus.NewDesc(
+			"pve_disk_read_bytes_total",
+			"Total bytes read from disk",
+			[]string{"node", "device"}, nil,
+		),
+		diskWriteBytes: prometheus.NewDesc(
+			"pve_disk_write_bytes_total",
+			"Total bytes written to disk",
+			[]string{"node", "device"}, nil,
+		),
+		diskReadsCompleted: prometheus.NewDesc(
+			"pve_disk_reads_completed_total",
+			"Total read operations completed",
+			[]string{"node", "device"}, nil,
+		),
+		diskWritesCompleted: prometheus.NewDesc(
+			"pve_disk_writes_completed_total",
+			"Total write operations completed",
+			[]string{"node", "device"}, nil,
+		),
+		diskIOTime: prometheus.NewDesc(
+			"pve_disk_io_time_seconds_total",
+			"Total time spent doing I/O operations",
+			[]string{"node", "device"}, nil,
+		),
 	}
 }
 
@@ -906,6 +940,13 @@ func (c *ProxmoxCollector) Describe(ch chan<- *prometheus.Desc) {
 	ch <- c.diskDataWritten
 	ch <- c.diskAvailableSpare
 	ch <- c.diskPercentageUsed
+
+	// Disk I/O
+	ch <- c.diskReadBytes
+	ch <- c.diskWriteBytes
+	ch <- c.diskReadsCompleted
+	ch <- c.diskWritesCompleted
+	ch <- c.diskIOTime
 }
 
 // Collect implements prometheus.Collector

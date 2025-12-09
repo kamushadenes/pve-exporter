@@ -1,9 +1,12 @@
 package collector
 
 import (
+	"bufio"
 	"encoding/json"
 	"log"
 	"os"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -14,6 +17,8 @@ const (
 	smartDataPath = "/var/lib/pve-exporter/smart.json"
 	// Maximum age of SMART data file before considering it stale (5 minutes)
 	smartDataMaxAge = 5 * time.Minute
+	// Path to diskstats
+	diskstatsPath = "/proc/diskstats"
 )
 
 // SmartData represents the JSON structure from pve-smart-collector.sh
@@ -37,8 +42,19 @@ type DiskInfo struct {
 	PercentageUsed        float64 `json:"percentage_used,omitempty"`
 }
 
-// collectDiskMetrics reads SMART data from JSON file and exports metrics
+// collectDiskMetrics reads SMART data from JSON file and disk I/O from /proc/diskstats
 func (c *ProxmoxCollector) collectDiskMetrics(ch chan<- prometheus.Metric) {
+	hostname := getHostname()
+
+	// Collect SMART metrics from JSON file (if available)
+	c.collectSmartMetrics(ch)
+
+	// Collect disk I/O metrics from /proc/diskstats (always available, no root needed)
+	c.collectDiskIOMetrics(ch, hostname)
+}
+
+// collectSmartMetrics reads SMART data from JSON file
+func (c *ProxmoxCollector) collectSmartMetrics(ch chan<- prometheus.Metric) {
 	// Check if file exists
 	info, err := os.Stat(smartDataPath)
 	if os.IsNotExist(err) {
@@ -100,4 +116,94 @@ func (c *ProxmoxCollector) collectDiskMetrics(ch chan<- prometheus.Metric) {
 			ch <- prometheus.MustNewConstMetric(c.diskPercentageUsed, prometheus.GaugeValue, disk.PercentageUsed, labels...)
 		}
 	}
+}
+
+// collectDiskIOMetrics reads disk I/O stats from /proc/diskstats
+func (c *ProxmoxCollector) collectDiskIOMetrics(ch chan<- prometheus.Metric, hostname string) {
+	file, err := os.Open(diskstatsPath)
+	if err != nil {
+		// /proc/diskstats not available (e.g., not Linux)
+		return
+	}
+	defer file.Close()
+
+	scanner := bufio.NewScanner(file)
+	for scanner.Scan() {
+		fields := strings.Fields(scanner.Text())
+		if len(fields) < 14 {
+			continue
+		}
+
+		device := fields[2]
+
+		// Skip partitions (only whole disks) - partitions have numbers at the end after letters
+		// e.g., sda1, nvme0n1p1 are partitions; sda, nvme0n1 are disks
+		if isPartition(device) {
+			continue
+		}
+
+		// Skip virtual devices
+		if strings.HasPrefix(device, "loop") || strings.HasPrefix(device, "ram") ||
+			strings.HasPrefix(device, "zd") || strings.HasPrefix(device, "dm-") {
+			continue
+		}
+
+		// Parse diskstats fields (Linux kernel documentation)
+		// Field 1: reads completed successfully
+		// Field 2: reads merged
+		// Field 3: sectors read
+		// Field 4: time spent reading (ms)
+		// Field 5: writes completed successfully
+		// Field 6: writes merged
+		// Field 7: sectors written
+		// Field 8: time spent writing (ms)
+		// Field 9: I/Os currently in progress
+		// Field 10: time spent doing I/Os (ms)
+		// Field 11: weighted time spent doing I/Os (ms)
+
+		readsCompleted, _ := strconv.ParseFloat(fields[3], 64)
+		sectorsRead, _ := strconv.ParseFloat(fields[5], 64)
+		writesCompleted, _ := strconv.ParseFloat(fields[7], 64)
+		sectorsWritten, _ := strconv.ParseFloat(fields[9], 64)
+		ioTimeMs, _ := strconv.ParseFloat(fields[12], 64)
+
+		// Each sector is 512 bytes
+		readBytes := sectorsRead * 512
+		writeBytes := sectorsWritten * 512
+		ioTimeSeconds := ioTimeMs / 1000
+
+		labels := []string{hostname, device}
+
+		ch <- prometheus.MustNewConstMetric(c.diskReadBytes, prometheus.CounterValue, readBytes, labels...)
+		ch <- prometheus.MustNewConstMetric(c.diskWriteBytes, prometheus.CounterValue, writeBytes, labels...)
+		ch <- prometheus.MustNewConstMetric(c.diskReadsCompleted, prometheus.CounterValue, readsCompleted, labels...)
+		ch <- prometheus.MustNewConstMetric(c.diskWritesCompleted, prometheus.CounterValue, writesCompleted, labels...)
+		ch <- prometheus.MustNewConstMetric(c.diskIOTime, prometheus.CounterValue, ioTimeSeconds, labels...)
+	}
+}
+
+// isPartition checks if a device name is a partition
+func isPartition(device string) bool {
+	// NVMe partitions: nvme0n1p1, nvme0n1p2, etc.
+	if strings.Contains(device, "nvme") && strings.Contains(device, "p") {
+		parts := strings.Split(device, "p")
+		if len(parts) >= 2 {
+			// Check if the last part is a number
+			_, err := strconv.Atoi(parts[len(parts)-1])
+			return err == nil
+		}
+	}
+
+	// SATA/SCSI partitions: sda1, sdb2, etc.
+	if len(device) > 0 {
+		lastChar := device[len(device)-1]
+		if lastChar >= '0' && lastChar <= '9' {
+			// Check if not nvme (handled above)
+			if !strings.HasPrefix(device, "nvme") {
+				return true
+			}
+		}
+	}
+
+	return false
 }
