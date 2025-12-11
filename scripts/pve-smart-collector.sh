@@ -1,17 +1,26 @@
 #!/bin/bash
 # pve-smart-collector.sh
 # Collects SMART data from all physical disks and writes to JSON file
-# Run as root via cron every minute
+# Run as root via cron every 5 minutes (SMART data doesn't change frequently)
 #
 # Usage: /usr/local/bin/pve-smart-collector.sh
-# Cron:  * * * * * root /usr/local/bin/pve-smart-collector.sh
+# Cron:  */5 * * * * root /usr/local/bin/pve-smart-collector.sh
 
 OUTPUT_DIR="/var/lib/pve-exporter"
 OUTPUT_FILE="${OUTPUT_DIR}/smart.json"
 TEMP_FILE="${OUTPUT_DIR}/smart.json.tmp"
+LOCK_FILE="${OUTPUT_DIR}/.smart-collector.lock"
 HOSTNAME=$(hostname -f 2>/dev/null || hostname)
 
-mkdir -p "$OUTPUT_DIR"
+# Ensure output directory exists before anything else
+mkdir -p "$OUTPUT_DIR" || exit 1
+
+# Use lock file to prevent parallel execution
+exec 200>"$LOCK_FILE"
+if ! flock -n 200; then
+    exit 0
+fi
+
 echo "{\"hostname\":\"$HOSTNAME\",\"timestamp\":$(date +%s),\"disks\":[" > "$TEMP_FILE"
 
 first=true
@@ -55,5 +64,9 @@ except: sys.exit(1)
 done
 
 echo "]}" >> "$TEMP_FILE"
-mv "$TEMP_FILE" "$OUTPUT_FILE"
-chmod 644 "$OUTPUT_FILE"
+
+# Only move if temp file exists and is valid
+if [ -f "$TEMP_FILE" ]; then
+    mv "$TEMP_FILE" "$OUTPUT_FILE"
+    chmod 644 "$OUTPUT_FILE"
+fi

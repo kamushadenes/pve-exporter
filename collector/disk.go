@@ -15,8 +15,8 @@ import (
 const (
 	// Default path for SMART data JSON file
 	smartDataPath = "/var/lib/pve-exporter/smart.json"
-	// Maximum age of SMART data file before considering it stale (5 minutes)
-	smartDataMaxAge = 5 * time.Minute
+	// Maximum age of SMART data file before considering it stale (10 minutes = 2x cron interval)
+	smartDataMaxAge = 10 * time.Minute
 	// Path to diskstats
 	diskstatsPath = "/proc/diskstats"
 )

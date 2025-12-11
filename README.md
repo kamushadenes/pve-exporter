@@ -374,8 +374,8 @@ sudo wget -O /usr/local/bin/pve-smart-collector.sh \
 sudo chmod +x /usr/local/bin/pve-smart-collector.sh
 sudo mkdir -p /var/lib/pve-exporter
 
-# 2. Add cron job
-echo '* * * * * root /usr/local/bin/pve-smart-collector.sh' | sudo tee /etc/cron.d/pve-smart-collector
+# 2. Add cron job (every 5 minutes - SMART data doesn't change frequently)
+echo '*/5 * * * * root /usr/local/bin/pve-smart-collector.sh' | sudo tee /etc/cron.d/pve-smart-collector
 
 # 3. Verify
 sudo /usr/local/bin/pve-smart-collector.sh
