@@ -1743,13 +1743,8 @@ func (c *ProxmoxCollector) collectBackupMetricsWithGuests(ch chan<- prometheus.M
 					go func(upid string) {
 						defer batchWg.Done()
 
-						// Dynamic log limit based on guest count (20 lines per guest, min 200)
-						logLimit := totalGuests * 20
-						if logLimit < 200 {
-							logLimit = 200
-						}
-
-						logData, err := c.apiRequest(fmt.Sprintf("/nodes/%s/tasks/%s/log?limit=%d", nodeName, url.PathEscape(upid), logLimit))
+						// Fetch task log with high limit (Proxmox default is ~50 if not specified)
+						logData, err := c.apiRequest(fmt.Sprintf("/nodes/%s/tasks/%s/log?limit=1000000", nodeName, url.PathEscape(upid)))
 						if err != nil {
 							return
 						}
