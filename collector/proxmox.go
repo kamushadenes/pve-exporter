@@ -165,6 +165,10 @@ type ProxmoxCollector struct {
 	diskReadsCompleted  *prometheus.Desc
 	diskWritesCompleted *prometheus.Desc
 	diskIOTime          *prometheus.Desc
+
+	// Backup metrics
+	vmLastBackup  *prometheus.Desc
+	lxcLastBackup *prometheus.Desc
 }
 
 // NewProxmoxCollector creates a new Proxmox collector
@@ -813,6 +817,18 @@ func NewProxmoxCollector(cfg *config.ProxmoxConfig) *ProxmoxCollector {
 			"Total time spent doing I/O operations",
 			[]string{"node", "device"}, nil,
 		),
+
+		// Backup metrics
+		vmLastBackup: prometheus.NewDesc(
+			"pve_vm_last_backup_timestamp",
+			"Unix timestamp of last successful backup",
+			[]string{"node", "vmid", "name"}, nil,
+		),
+		lxcLastBackup: prometheus.NewDesc(
+			"pve_lxc_last_backup_timestamp",
+			"Unix timestamp of last successful backup",
+			[]string{"node", "vmid", "name"}, nil,
+		),
 	}
 }
 
@@ -947,6 +963,10 @@ func (c *ProxmoxCollector) Describe(ch chan<- *prometheus.Desc) {
 	ch <- c.diskReadsCompleted
 	ch <- c.diskWritesCompleted
 	ch <- c.diskIOTime
+
+	// Backup
+	ch <- c.vmLastBackup
+	ch <- c.lxcLastBackup
 }
 
 // Collect implements prometheus.Collector
@@ -984,7 +1004,7 @@ func (c *ProxmoxCollector) Collect(ch chan<- prometheus.Metric) {
 	// Run all collection functions in parallel for better performance
 	var wg sync.WaitGroup
 
-	wg.Add(6)
+	wg.Add(7)
 
 	go func() {
 		defer wg.Done()
@@ -1014,6 +1034,11 @@ func (c *ProxmoxCollector) Collect(ch chan<- prometheus.Metric) {
 	go func() {
 		defer wg.Done()
 		c.collectDiskMetrics(ch)
+	}()
+
+	go func() {
+		defer wg.Done()
+		c.collectBackupMetrics(ch, nodes)
 	}()
 
 	wg.Wait()
@@ -1554,4 +1579,118 @@ func (c *ProxmoxCollector) collectStorageMetrics(ch chan<- prometheus.Metric, no
 		}(node)
 	}
 	wg.Wait()
+}
+
+// collectBackupMetrics collects last backup timestamps for VMs and LXC containers
+func (c *ProxmoxCollector) collectBackupMetrics(ch chan<- prometheus.Metric, nodes []string) {
+	// First, collect all VMs and LXCs with their names for label correlation
+	type guestInfo struct {
+		Node string
+		Name string
+		Type string // "qemu" or "lxc"
+	}
+	guests := make(map[string]guestInfo) // key: vmid string
+	var guestsMutex sync.Mutex
+
+	var wg sync.WaitGroup
+	for _, node := range nodes {
+		wg.Add(1)
+		go func(nodeName string) {
+			defer wg.Done()
+			// Fetch VMs
+			vmData, err := c.apiRequest(fmt.Sprintf("/nodes/%s/qemu", nodeName))
+			if err == nil {
+				var vmResult struct {
+					Data []struct {
+						VMID int64  `json:"vmid"`
+						Name string `json:"name"`
+					} `json:"data"`
+				}
+				if json.Unmarshal(vmData, &vmResult) == nil {
+					guestsMutex.Lock()
+					for _, vm := range vmResult.Data {
+						vmid := strconv.FormatInt(vm.VMID, 10)
+						guests[vmid] = guestInfo{Node: nodeName, Name: vm.Name, Type: "qemu"}
+					}
+					guestsMutex.Unlock()
+				}
+			}
+			// Fetch LXCs
+			lxcData, err := c.apiRequest(fmt.Sprintf("/nodes/%s/lxc", nodeName))
+			if err == nil {
+				var lxcResult struct {
+					Data []struct {
+						VMID int64  `json:"vmid"`
+						Name string `json:"name"`
+					} `json:"data"`
+				}
+				if json.Unmarshal(lxcData, &lxcResult) == nil {
+					guestsMutex.Lock()
+					for _, lxc := range lxcResult.Data {
+						vmid := strconv.FormatInt(lxc.VMID, 10)
+						guests[vmid] = guestInfo{Node: nodeName, Name: lxc.Name, Type: "lxc"}
+					}
+					guestsMutex.Unlock()
+				}
+			}
+		}(node)
+	}
+	wg.Wait()
+
+	// Now collect backup tasks and find latest successful backup per VMID
+	backups := make(map[string]int64) // key: vmid, value: endtime timestamp
+	var backupsMutex sync.Mutex
+
+	for _, node := range nodes {
+		wg.Add(1)
+		go func(nodeName string) {
+			defer wg.Done()
+			// Fetch vzdump tasks (limit 500 to get enough history)
+			tasksData, err := c.apiRequest(fmt.Sprintf("/nodes/%s/tasks?typefilter=vzdump&limit=500", nodeName))
+			if err != nil {
+				return
+			}
+
+			var tasksResult struct {
+				Data []struct {
+					ID        string `json:"id"`      // VMID as string
+					EndTime   int64  `json:"endtime"` // Unix timestamp
+					Status    string `json:"status"`  // "OK" for successful
+					StartTime int64  `json:"starttime"`
+				} `json:"data"`
+			}
+
+			if err := json.Unmarshal(tasksData, &tasksResult); err != nil {
+				return
+			}
+
+			backupsMutex.Lock()
+			for _, task := range tasksResult.Data {
+				// Only count successful backups
+				if task.Status != "OK" || task.ID == "" {
+					continue
+				}
+				// Keep only the latest backup per VMID
+				if existing, ok := backups[task.ID]; !ok || task.EndTime > existing {
+					backups[task.ID] = task.EndTime
+				}
+			}
+			backupsMutex.Unlock()
+		}(node)
+	}
+	wg.Wait()
+
+	// Emit metrics for each guest with a backup
+	for vmid, endtime := range backups {
+		guest, ok := guests[vmid]
+		if !ok {
+			continue // Skip if we don't have guest info (maybe deleted)
+		}
+		labels := []string{guest.Node, vmid, guest.Name}
+		if guest.Type == "qemu" {
+			ch <- prometheus.MustNewConstMetric(c.vmLastBackup, prometheus.GaugeValue, float64(endtime), labels...)
+		} else {
+			ch <- prometheus.MustNewConstMetric(c.lxcLastBackup, prometheus.GaugeValue, float64(endtime), labels...)
+		}
+	}
 }
