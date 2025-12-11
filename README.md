@@ -180,7 +180,8 @@ As an alternative to a config file, you can use environment variables:
 
 ## 📈 Grafana Dashboard
 
-Import the official dashboard from Grafana.com: 24512
+Import the official dashboard from [Grafana.com](https://grafana.com/grafana/dashboards/24550): **24550**
+
 Or import manually from [`grafana/pve-exporter.json`](grafana/pve-exporter.json)
 
 **Features:**
