@@ -87,6 +87,18 @@ gofmt -s -l .
 go build -o pve-exporter .
 ```
 
+### Quality Checks (Run with every build!)
+
+```bash
+# Lint check
+go vet ./...
+
+# Cyclomatic complexity (max 15)
+gocyclo -over 15 .
+```
+
+> ⚠️ **MANDATORY**: Run `go vet` and `gocyclo -over 15` before every push. Functions with complexity > 15 will fail Go Report Card.
+
 ### Build with Version Info
 
 ```bash
@@ -209,10 +221,22 @@ chore: update dependencies
 
 ### Pre-Push Verification
 
-Before pushing, verify the build:
+Before pushing, verify the build and code quality:
 ```bash
+# Build
 go build -o pve-exporter .
+
+# Run linting (MANDATORY)
+go vet ./...
+
+# Check cyclomatic complexity (MANDATORY - max 15)
+gocyclo -over 15 .
+
+# If gocyclo is not installed:
+go install github.com/fzipp/gocyclo/cmd/gocyclo@latest
 ```
+
+> ⚠️ **All builds must pass `go vet` and have no functions with cyclomatic complexity > 15.**
 
 ## Release Process
 

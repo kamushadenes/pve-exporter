@@ -13,6 +13,9 @@ A professional Prometheus exporter for Proxmox VE, written in Go. It collects co
   - **LXC Containers**: CPU, Memory, Disk, Network I/O, Uptime, Status.
   - **Storage**: Usage, Availability, Total size.
   - **ZFS**: Pool health, fragmentation, ARC statistics.
+  - **Cluster/HA**: Quorum status, node counts, HA resource management.
+  - **Replication**: Sync timestamps, duration, status monitoring.
+  - **Certificates**: SSL certificate expiry tracking.
   - **Hardware Sensors**: Temperatures, fan speeds, voltages, power (via lm-sensors).
   - **Disk Metrics**: I/O throughput (automatic), SMART health, temperature, TBW (optional setup).
 - **Secure**: Supports API Token authentication (recommended) and standard password auth.
@@ -269,6 +272,7 @@ The exporter exposes the following metrics at `/metrics`.
 | `pve_vm_nic_out_bytes_total` | NIC output bytes (label: interface) |
 | `pve_vm_last_backup_timestamp` | Unix timestamp of last successful backup |
 
+
 ### LXC Metrics (Containers)
 
 | Metric | Description |
@@ -296,6 +300,7 @@ The exporter exposes the following metrics at `/metrics`.
 | `pve_lxc_pressure_memory_full` | Memory pressure full |
 | `pve_lxc_pressure_memory_some` | Memory pressure some |
 | `pve_lxc_last_backup_timestamp` | Unix timestamp of last successful backup |
+
 
 ### Storage Metrics
 
@@ -329,6 +334,30 @@ The exporter exposes the following metrics at `/metrics`.
 | `pve_zfs_arc_l2_misses_total` | L2ARC misses |
 | `pve_zfs_arc_l2_size_bytes` | L2ARC size |
 | `pve_zfs_arc_l2_header_size_bytes` | L2ARC header size |
+
+### Cluster/HA Metrics
+
+| Metric | Description |
+|--------|-------------|
+| `pve_cluster_quorate` | Cluster has quorum (1=yes, 0=no) |
+| `pve_cluster_nodes_total` | Total number of nodes in cluster |
+| `pve_cluster_nodes_online` | Number of online nodes |
+| `pve_ha_resources_total` | Total HA managed resources |
+| `pve_ha_resources_active` | Number of active HA resources |
+
+### Replication Metrics
+
+| Metric | Description |
+|--------|-------------|
+| `pve_replication_last_sync_timestamp` | Unix timestamp of last replication (labels: guest, job) |
+| `pve_replication_duration_seconds` | Duration of last replication (labels: guest, job) |
+| `pve_replication_status` | Replication status (1=OK, 0=error, labels: guest, job) |
+
+### Certificate Metrics
+
+| Metric | Description |
+|--------|-------------|
+| `pve_certificate_expiry_seconds` | Seconds until SSL certificate expires |
 
 ### Hardware Sensor Metrics
 
