@@ -52,6 +52,22 @@ func getBinaryName() string {
 	return fmt.Sprintf("pve-exporter-%s-%s", runtime.GOOS, runtime.GOARCH)
 }
 
+// parseVersion parses a version string into major, minor, patch integers
+func parseVersion(version string) (major, minor, patch int) {
+	version = strings.TrimPrefix(version, "v")
+	parts := strings.Split(version, ".")
+	if len(parts) >= 1 {
+		fmt.Sscanf(parts[0], "%d", &major)
+	}
+	if len(parts) >= 2 {
+		fmt.Sscanf(parts[1], "%d", &minor)
+	}
+	if len(parts) >= 3 {
+		fmt.Sscanf(parts[2], "%d", &patch)
+	}
+	return
+}
+
 // compareVersions returns true if newVersion is newer than currentVersion
 // Versions are expected in format "v1.2.3"
 func compareVersions(currentVersion, newVersion string) bool {
@@ -60,13 +76,16 @@ func compareVersions(currentVersion, newVersion string) bool {
 		return true
 	}
 
-	// Strip 'v' prefix if present
-	current := strings.TrimPrefix(currentVersion, "v")
-	new := strings.TrimPrefix(newVersion, "v")
+	curMajor, curMinor, curPatch := parseVersion(currentVersion)
+	newMajor, newMinor, newPatch := parseVersion(newVersion)
 
-	// Simple string comparison works for semantic versioning
-	// For more robust comparison, use a semver library
-	return new > current
+	if newMajor != curMajor {
+		return newMajor > curMajor
+	}
+	if newMinor != curMinor {
+		return newMinor > curMinor
+	}
+	return newPatch > curPatch
 }
 
 // findAssetURL finds the download URL for the current platform
