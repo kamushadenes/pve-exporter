@@ -1,0 +1,159 @@
+package config
+
+import (
+	"os"
+	"testing"
+)
+
+func TestLoadFromFile(t *testing.T) {
+	content := []byte(`
+proxmox:
+  host: "test.proxmox.com"
+  port: 8006
+  user: "test@pam"
+  password: "password123"
+  insecure_skip_verify: true
+
+server:
+  listen_address: ":9090"
+  metrics_path: "/test-metrics"
+`)
+	tmpfile, err := os.CreateTemp("", "config-*.yml")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.Remove(tmpfile.Name())
+
+	if _, err := tmpfile.Write(content); err != nil {
+		t.Fatal(err)
+	}
+	if err := tmpfile.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	cfg, err := LoadFromFile(tmpfile.Name())
+	if err != nil {
+		t.Fatalf("LoadFromFile failed: %v", err)
+	}
+
+	if cfg.Proxmox.Host != "test.proxmox.com" {
+		t.Errorf("expected host 'test.proxmox.com', got '%s'", cfg.Proxmox.Host)
+	}
+	if cfg.Proxmox.User != "test@pam" {
+		t.Errorf("expected user 'test@pam', got '%s'", cfg.Proxmox.User)
+	}
+	if cfg.Server.ListenAddress != ":9090" {
+		t.Errorf("expected listen address ':9090', got '%s'", cfg.Server.ListenAddress)
+	}
+}
+
+func TestLoadFromEnv(t *testing.T) {
+	os.Setenv("PVE_HOST", "env.proxmox.com")
+	os.Setenv("PVE_USER", "env@pam")
+	os.Setenv("PVE_PASSWORD", "envpass")
+	os.Setenv("LISTEN_ADDRESS", ":9111")
+	defer func() {
+		os.Unsetenv("PVE_HOST")
+		os.Unsetenv("PVE_USER")
+		os.Unsetenv("PVE_PASSWORD")
+		os.Unsetenv("LISTEN_ADDRESS")
+	}()
+
+	cfg, err := LoadFromFile("")
+	if err != nil {
+		t.Fatalf("LoadFromFile failed: %v", err)
+	}
+
+	if cfg.Proxmox.Host != "env.proxmox.com" {
+		t.Errorf("expected host 'env.proxmox.com', got '%s'", cfg.Proxmox.Host)
+	}
+	if cfg.Proxmox.User != "env@pam" {
+		t.Errorf("expected user 'env@pam', got '%s'", cfg.Proxmox.User)
+	}
+	if cfg.Server.ListenAddress != ":9111" {
+		t.Errorf("expected listen address ':9111', got '%s'", cfg.Server.ListenAddress)
+	}
+}
+
+func TestValidate(t *testing.T) {
+	tests := []struct {
+		name    string
+		cfg     Config
+		wantErr bool
+	}{
+		{
+			name: "valid password auth",
+			cfg: Config{
+				Proxmox: ProxmoxConfig{
+					Host:     "localhost",
+					User:     "root@pam",
+					Password: "password",
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name: "valid token auth",
+			cfg: Config{
+				Proxmox: ProxmoxConfig{
+					Host:        "localhost",
+					TokenID:     "user@pam!token",
+					TokenSecret: "secret",
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name: "missing host",
+			cfg: Config{
+				Proxmox: ProxmoxConfig{
+					Host:     "",
+					User:     "root@pam",
+					Password: "password",
+				},
+			},
+			wantErr: true,
+		},
+		{
+			name: "missing auth",
+			cfg: Config{
+				Proxmox: ProxmoxConfig{
+					Host: "localhost",
+				},
+			},
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if err := tt.cfg.Validate(); (err != nil) != tt.wantErr {
+				t.Errorf("Validate() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
+	}
+}
+
+func TestGetEnvBool(t *testing.T) {
+	os.Setenv("TEST_BOOL_TRUE", "true")
+	os.Setenv("TEST_BOOL_1", "1")
+	os.Setenv("TEST_BOOL_FALSE", "false")
+	defer func() {
+		os.Unsetenv("TEST_BOOL_TRUE")
+		os.Unsetenv("TEST_BOOL_1")
+		os.Unsetenv("TEST_BOOL_FALSE")
+	}()
+
+	if !getEnvBool("TEST_BOOL_TRUE", false) {
+		t.Error("expected true for 'true'")
+	}
+	if !getEnvBool("TEST_BOOL_1", false) {
+		t.Error("expected true for '1'")
+	}
+	if getEnvBool("TEST_BOOL_FALSE", true) {
+		t.Error("expected false for 'false'")
+	}
+	if !getEnvBool("NON_EXISTENT", true) {
+		t.Error("expected default value true")
+	}
+}

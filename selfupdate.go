@@ -57,13 +57,19 @@ func parseVersion(version string) (major, minor, patch int) {
 	version = strings.TrimPrefix(version, "v")
 	parts := strings.Split(version, ".")
 	if len(parts) >= 1 {
-		fmt.Sscanf(parts[0], "%d", &major)
+		if _, err := fmt.Sscanf(parts[0], "%d", &major); err != nil {
+			major = 0
+		}
 	}
 	if len(parts) >= 2 {
-		fmt.Sscanf(parts[1], "%d", &minor)
+		if _, err := fmt.Sscanf(parts[1], "%d", &minor); err != nil {
+			minor = 0
+		}
 	}
 	if len(parts) >= 3 {
-		fmt.Sscanf(parts[2], "%d", &patch)
+		if _, err := fmt.Sscanf(parts[2], "%d", &patch); err != nil {
+			patch = 0
+		}
 	}
 	return
 }
@@ -181,7 +187,9 @@ func replaceExecutable(execPath, tmpPath string) error {
 	}
 
 	if err := os.Rename(tmpPath, execPath); err != nil {
-		os.Rename(backupPath, execPath) // Try to restore backup
+		if restoreErr := os.Rename(backupPath, execPath); restoreErr != nil {
+			fmt.Printf("CRITICAL: Failed to restore backup: %v\n", restoreErr)
+		}
 		return fmt.Errorf("failed to install new binary: %w", err)
 	}
 

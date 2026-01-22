@@ -432,10 +432,10 @@ git clone https://github.com/bigtcze/pve-exporter.git
 cd pve-exporter
 
 # Build
-go build -o pve-exporter .
+make build
 
 # Test
-go test ./...
+make test
 ```
 
 ## 🤝 Contributing
