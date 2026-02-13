@@ -71,13 +71,13 @@ func main() {
 	// Health endpoint
 	mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		fmt.Fprintf(w, "OK\n")
+		_, _ = fmt.Fprintf(w, "OK\n")
 	})
 
 	// Root endpoint with info
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/html")
-		fmt.Fprintf(w, `<html>
+		_, _ = fmt.Fprintf(w, `<html>
 <head><title>Proxmox Exporter</title></head>
 <body>
 <h1>Proxmox Exporter</h1>
@@ -102,7 +102,7 @@ func main() {
 		signal.Notify(sigChan, os.Interrupt, syscall.SIGTERM)
 		<-sigChan
 		log.Println("Shutting down...")
-		server.Close()
+		_ = server.Close()
 	}()
 
 	log.Printf("Starting HTTP server on %s", cfg.Server.ListenAddress)

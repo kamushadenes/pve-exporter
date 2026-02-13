@@ -38,12 +38,13 @@ func (c *ProxmoxCollector) collectClusterMetrics(ch chan<- prometheus.Metric) {
 	var nodesTotal, nodesOnline int
 	var hasClusterEntry bool
 	for _, item := range result.Data {
-		if item.Type == "cluster" {
+		switch item.Type {
+		case "cluster":
 			// Cluster-level info
 			ch <- prometheus.MustNewConstMetric(c.clusterQuorate, prometheus.GaugeValue, float64(item.Quorate))
 			nodesTotal = item.Nodes
 			hasClusterEntry = true
-		} else if item.Type == "node" {
+		case "node":
 			// Count nodes manually (for single-node or when Nodes field is 0)
 			if nodesTotal == 0 {
 				nodesTotal++

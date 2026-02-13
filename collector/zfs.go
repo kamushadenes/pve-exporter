@@ -82,7 +82,7 @@ func (c *ProxmoxCollector) collectZFSARCMetrics(ch chan<- prometheus.Metric) {
 	if err != nil {
 		return
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 
 	hostname, _ := os.Hostname()
 	if hostname == "" {

@@ -33,7 +33,7 @@ func CheckLatestVersion() (*GitHubRelease, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to query GitHub API: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("GitHub API returned status %d", resp.StatusCode)
@@ -124,7 +124,7 @@ func downloadBinary(downloadURL, execPath string) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("failed to download binary: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		return "", fmt.Errorf("download failed with status %d", resp.StatusCode)
@@ -137,14 +137,14 @@ func downloadBinary(downloadURL, execPath string) (string, error) {
 	tmpPath := tmpFile.Name()
 
 	_, err = io.Copy(tmpFile, resp.Body)
-	tmpFile.Close()
+	_ = tmpFile.Close()
 	if err != nil {
-		os.Remove(tmpPath)
+		_ = os.Remove(tmpPath)
 		return "", fmt.Errorf("failed to write binary: %w", err)
 	}
 
 	if err := os.Chmod(tmpPath, 0755); err != nil {
-		os.Remove(tmpPath)
+		_ = os.Remove(tmpPath)
 		return "", fmt.Errorf("failed to chmod binary: %w", err)
 	}
 
@@ -193,7 +193,7 @@ func replaceExecutable(execPath, tmpPath string) error {
 		return fmt.Errorf("failed to install new binary: %w", err)
 	}
 
-	os.Remove(backupPath)
+	_ = os.Remove(backupPath)
 	return nil
 }
 
@@ -244,12 +244,12 @@ func SelfUpdate(currentVersion string) error {
 	}
 
 	if err := verifyBinary(tmpPath); err != nil {
-		os.Remove(tmpPath)
+		_ = os.Remove(tmpPath)
 		return err
 	}
 
 	if err := replaceExecutable(execPath, tmpPath); err != nil {
-		os.Remove(tmpPath)
+		_ = os.Remove(tmpPath)
 		return err
 	}
 

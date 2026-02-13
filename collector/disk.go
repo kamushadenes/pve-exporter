@@ -125,7 +125,7 @@ func (c *ProxmoxCollector) collectDiskIOMetrics(ch chan<- prometheus.Metric, hos
 		// /proc/diskstats not available (e.g., not Linux)
 		return
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 
 	scanner := bufio.NewScanner(file)
 	for scanner.Scan() {

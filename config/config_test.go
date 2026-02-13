@@ -22,7 +22,7 @@ server:
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer os.Remove(tmpfile.Name())
+	defer func() { _ = os.Remove(tmpfile.Name()) }()
 
 	if _, err := tmpfile.Write(content); err != nil {
 		t.Fatal(err)
@@ -48,15 +48,15 @@ server:
 }
 
 func TestLoadFromEnv(t *testing.T) {
-	os.Setenv("PVE_HOST", "env.proxmox.com")
-	os.Setenv("PVE_USER", "env@pam")
-	os.Setenv("PVE_PASSWORD", "envpass")
-	os.Setenv("LISTEN_ADDRESS", ":9111")
+	_ = os.Setenv("PVE_HOST", "env.proxmox.com")
+	_ = os.Setenv("PVE_USER", "env@pam")
+	_ = os.Setenv("PVE_PASSWORD", "envpass")
+	_ = os.Setenv("LISTEN_ADDRESS", ":9111")
 	defer func() {
-		os.Unsetenv("PVE_HOST")
-		os.Unsetenv("PVE_USER")
-		os.Unsetenv("PVE_PASSWORD")
-		os.Unsetenv("LISTEN_ADDRESS")
+		_ = os.Unsetenv("PVE_HOST")
+		_ = os.Unsetenv("PVE_USER")
+		_ = os.Unsetenv("PVE_PASSWORD")
+		_ = os.Unsetenv("LISTEN_ADDRESS")
 	}()
 
 	cfg, err := LoadFromFile("")
@@ -135,13 +135,13 @@ func TestValidate(t *testing.T) {
 }
 
 func TestGetEnvBool(t *testing.T) {
-	os.Setenv("TEST_BOOL_TRUE", "true")
-	os.Setenv("TEST_BOOL_1", "1")
-	os.Setenv("TEST_BOOL_FALSE", "false")
+	_ = os.Setenv("TEST_BOOL_TRUE", "true")
+	_ = os.Setenv("TEST_BOOL_1", "1")
+	_ = os.Setenv("TEST_BOOL_FALSE", "false")
 	defer func() {
-		os.Unsetenv("TEST_BOOL_TRUE")
-		os.Unsetenv("TEST_BOOL_1")
-		os.Unsetenv("TEST_BOOL_FALSE")
+		_ = os.Unsetenv("TEST_BOOL_TRUE")
+		_ = os.Unsetenv("TEST_BOOL_1")
+		_ = os.Unsetenv("TEST_BOOL_FALSE")
 	}()
 
 	if !getEnvBool("TEST_BOOL_TRUE", false) {
