@@ -95,7 +95,7 @@ func (c *ProxmoxCollector) Collect(ch chan<- prometheus.Metric) {
 
 	go func() {
 		defer wg.Done()
-		c.collectDiskMetrics(ch)
+		c.collectDiskMetrics(ch, nodes)
 	}()
 
 	go func() {
